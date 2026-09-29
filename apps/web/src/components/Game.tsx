@@ -59,13 +59,21 @@ export function Game() {
 
       <StatusLine game={game} myTurn={myTurn} current={current} isMe={(id) => id === playerId} />
 
-      <ul className="mx-auto w-full max-w-md space-y-0.5 text-center text-xs text-slate-500" aria-live="polite">
-        {log.slice(-3).map((line, i) => (
-          <li key={`${log.length}-${i}`} className={i === Math.min(log.length, 3) - 1 ? 'text-slate-300' : ''}>
-            {line}
-          </li>
-        ))}
-      </ul>
+      {log.length > 0 && (
+        <ul
+          className="mx-auto w-full max-w-md space-y-1 rounded-2xl bg-white/5 px-4 py-2.5 text-center text-sm ring-1 ring-white/10"
+          aria-live="polite"
+        >
+          {log.slice(-3).map((line, i, shown) => (
+            <li
+              key={`${log.length}-${i}`}
+              className={i === shown.length - 1 ? 'font-semibold text-white' : 'text-slate-300'}
+            >
+              {line}
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="mt-auto">
         {me && me.status === 'active' ? (
@@ -351,7 +359,17 @@ function StatusLine({
           : `Waiting for ${who}…`;
   }
   return (
-    <p className={`min-h-6 text-center font-semibold ${myTurn ? 'text-amber-300' : 'text-slate-300'}`}>{text}</p>
+    <div className="flex min-h-11 justify-center">
+      {text && (
+        <p
+          className={`rounded-full px-5 py-2 text-center text-base font-bold ring-1 sm:text-lg ${
+            myTurn ? 'bg-amber-400/15 text-amber-300 ring-amber-400/50' : 'bg-white/10 text-slate-100 ring-white/15'
+          }`}
+        >
+          {text}
+        </p>
+      )}
+    </div>
   );
 }
 
