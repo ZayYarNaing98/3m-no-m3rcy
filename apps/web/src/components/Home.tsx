@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { navigate } from '../App';
-import heroImage from '../assets/uno-nomercy.jpeg';
+import { HeroBanner } from './HeroBanner';
 
 export function Home() {
   const [code, setCode] = useState('');
@@ -35,14 +35,7 @@ export function Home() {
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-6 p-6">
       <header className="text-center">
-        <h1 className="sr-only">UNO No Mercy</h1>
-        <img
-          src={heroImage}
-          alt="UNO Show 'Em No Mercy cards flying out of the deck"
-          width={597}
-          height={335}
-          className="w-full rounded-3xl shadow-2xl shadow-red-950/60 ring-1 ring-white/10"
-        />
+        <HeroBanner />
         <p className="mt-4 text-slate-400">168 cards. Stack everything. 25 cards and you're out.</p>
       </header>
 

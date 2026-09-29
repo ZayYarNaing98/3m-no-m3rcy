@@ -1,6 +1,7 @@
 import type { RoomView } from '@nomercy/engine';
 import { useState } from 'react';
 import { NAME_KEY, useGame } from '../store';
+import { HeroBanner } from './HeroBanner';
 
 export function JoinForm({ room }: { room: RoomView }) {
   const join = useGame((s) => s.join);
@@ -28,8 +29,9 @@ export function JoinForm({ room }: { room: RoomView }) {
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto flex min-h-full max-w-sm flex-col justify-center gap-4 p-6">
-      <p className="text-center text-slate-400">
+    <form onSubmit={submit} className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-4 p-6">
+      <HeroBanner />
+      <p className="mt-2 text-center text-slate-400">
         Room <span className="font-mono text-slate-100">{room.code}</span> · {room.players.length}/10 players
       </p>
       <input
