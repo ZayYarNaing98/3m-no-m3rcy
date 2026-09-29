@@ -28,16 +28,21 @@ export function Game() {
 
   return (
     <div className="mx-auto flex min-h-full max-w-5xl flex-col gap-3 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
-      <div className="flex items-center justify-between text-xs text-slate-400">
-        <span className="font-mono">{room.code}</span>
-        <span className="flex items-center gap-3">
-          <span>Turn {game.turn}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <RoomCodeChip code={room.code} />
+        <span className="flex items-center gap-2">
+          <span className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-slate-100 ring-1 ring-white/15">
+            Turn <span className="tabular-nums">{game.turn}</span>
+          </span>
           {!finished && (
             <button
-              className="rounded-full bg-white/10 px-3 py-1 font-semibold text-slate-200 hover:bg-white/15"
+              className="flex items-center gap-1.5 rounded-full bg-red-600/15 px-3.5 py-1.5 font-bold text-red-300 ring-1 ring-red-500/60 transition hover:bg-red-600 hover:text-white active:scale-[0.97]"
               onClick={() => setConfirmLeave(true)}
             >
-              Leave
+              <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M12 14l4-4-4-4M16 10H8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Leave game
             </button>
           )}
         </span>
@@ -102,6 +107,32 @@ export function Game() {
       )}
       <TableFx />
     </div>
+  );
+}
+
+function RoomCodeChip({ code }: { code: string }) {
+  const showToast = useGame((s) => s.showToast);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(`${location.origin}/r/${code}`);
+      showToast('Invite link copied');
+    } catch {
+      showToast(`Room code: ${code}`);
+    }
+  }
+  return (
+    <button
+      className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 ring-1 ring-white/15 transition hover:bg-white/15"
+      onClick={copy}
+      title="Copy invite link"
+    >
+      <span className="text-slate-400">Room</span>
+      <span className="font-mono font-bold tracking-widest text-slate-100">{code}</span>
+      <svg viewBox="0 0 20 20" className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+        <rect x="7" y="7" width="9" height="9" rx="2" />
+        <path d="M13 7V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2" />
+      </svg>
+    </button>
   );
 }
 
