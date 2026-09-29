@@ -45,16 +45,22 @@ export function Home() {
         {busy ? 'Creating…' : 'Create a room'}
       </button>
 
-      <form onSubmit={join} className="flex gap-2">
+      <form
+        onSubmit={join}
+        className="flex w-full items-center rounded-2xl bg-white/10 p-1 ring-sky-400 focus-within:ring-2"
+      >
         <input
-          className="input flex-1 text-center font-mono tracking-[0.3em] uppercase"
-          placeholder="CODE"
+          className="min-w-0 flex-1 bg-transparent px-4 py-2 font-mono tracking-[0.3em] uppercase outline-none placeholder:text-slate-500"
+          placeholder="ROOM CODE"
           maxLength={6}
           value={code}
           onChange={(e) => setCode(e.target.value)}
           aria-label="Room code"
         />
-        <button className="btn-secondary" type="submit">
+        <button
+          className="rounded-xl bg-white/15 px-5 py-2 font-semibold transition hover:bg-white/25 active:scale-[0.98]"
+          type="submit"
+        >
           Join
         </button>
       </form>
