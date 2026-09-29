@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { CardGallery } from './components/CardGallery';
 import { Game } from './components/Game';
 import { Home } from './components/Home';
 import { JoinForm } from './components/JoinForm';
@@ -24,6 +25,8 @@ export function App() {
     addEventListener('popstate', onPop);
     return () => removeEventListener('popstate', onPop);
   }, []);
+
+  if (import.meta.env.DEV && location.pathname === '/cards') return <CardGallery />;
 
   return (
     <>
