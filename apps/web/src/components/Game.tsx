@@ -6,6 +6,7 @@ import { Card, CardBack, COLOR_BG, COLOR_RING } from './Card';
 
 export function Game() {
   const { game, room, playerId, stateVersion, deadline, log, send } = useGame();
+  const [confirmLeave, setConfirmLeave] = useState(false);
   if (!game || !room) return null;
 
   const me = game.players.find((p) => p.id === playerId);
@@ -27,7 +28,17 @@ export function Game() {
     <div className="mx-auto flex min-h-full max-w-5xl flex-col gap-3 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
       <div className="flex items-center justify-between text-xs text-slate-400">
         <span className="font-mono">{room.code}</span>
-        <span>Turn {game.turn}</span>
+        <span className="flex items-center gap-3">
+          <span>Turn {game.turn}</span>
+          {!finished && (
+            <button
+              className="rounded-full bg-white/10 px-3 py-1 font-semibold text-slate-200 hover:bg-white/15"
+              onClick={() => setConfirmLeave(true)}
+            >
+              Leave
+            </button>
+          )}
+        </span>
       </div>
 
       <Opponents
@@ -84,7 +95,35 @@ export function Game() {
         />
       )}
       {finished && <Results game={game} isHost={room.hostId === playerId} />}
+      {confirmLeave && !finished && (
+        <LeaveSheet forfeits={me?.status === 'active'} onCancel={() => setConfirmLeave(false)} />
+      )}
     </div>
+  );
+}
+
+function LeaveSheet({ forfeits, onCancel }: { forfeits: boolean; onCancel: () => void }) {
+  const leave = useGame((s) => s.leave);
+  return (
+    <Sheet
+      title="Leave the game?"
+      subtitle={forfeits ? 'You forfeit this round and your cards go back into the deck.' : 'You give up your seat in this room.'}
+    >
+      <div className="flex flex-col gap-2">
+        <button
+          className="btn-danger"
+          onClick={async () => {
+            await leave();
+            navigate('/');
+          }}
+        >
+          Leave game
+        </button>
+        <button className="btn-secondary" onClick={onCancel}>
+          Keep playing
+        </button>
+      </div>
+    </Sheet>
   );
 }
 
