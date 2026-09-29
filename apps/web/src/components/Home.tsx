@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { navigate } from '../App';
+import heroImage from '../assets/uno-nomercy.jpeg';
 
 export function Home() {
   const [code, setCode] = useState('');
@@ -32,13 +33,17 @@ export function Home() {
   }
 
   return (
-    <div className="mx-auto flex min-h-full max-w-sm flex-col justify-center gap-8 p-6">
+    <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-6 p-6">
       <header className="text-center">
-        <h1 className="text-5xl font-black tracking-tight">
-          <span className="text-red-500">UNO</span> <span className="text-yellow-400">No</span>{' '}
-          <span className="text-blue-400">Mercy</span>
-        </h1>
-        <p className="mt-3 text-slate-400">168 cards. Stack everything. 25 cards and you're out.</p>
+        <h1 className="sr-only">UNO No Mercy</h1>
+        <img
+          src={heroImage}
+          alt="UNO Show 'Em No Mercy cards flying out of the deck"
+          width={597}
+          height={335}
+          className="w-full rounded-3xl shadow-2xl shadow-red-950/60 ring-1 ring-white/10"
+        />
+        <p className="mt-4 text-slate-400">168 cards. Stack everything. 25 cards and you're out.</p>
       </header>
 
       <button className="btn-primary" onClick={create} disabled={busy}>
