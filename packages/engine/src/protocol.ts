@@ -1,0 +1,63 @@
+import type { Color, GameEvent } from './types';
+import type { PlayerView } from './view';
+
+/** Wire format: every message is `{ type, requestId?, payload }` as JSON text. */
+export type ClientMessage = { requestId?: string } & (
+  | { type: 'room:join'; payload: { name: string } }
+  | { type: 'room:rejoin'; payload: { playerToken: string } }
+  | { type: 'room:leave'; payload: Record<string, never> }
+  | { type: 'room:kick'; payload: { playerId: string } }
+  | { type: 'room:settings'; payload: { turnSeconds: number } }
+  | { type: 'game:start'; payload: Record<string, never> }
+  | { type: 'game:play'; payload: { cardId: string; stateVersion: number } }
+  | { type: 'game:draw'; payload: { stateVersion: number } }
+  | { type: 'game:chooseColor'; payload: { color: Color } }
+  | { type: 'game:chooseSwap'; payload: { targetId: string } }
+  | { type: 'game:rouletteColor'; payload: { color: Color } }
+  | { type: 'game:callUno'; payload: Record<string, never> }
+  | { type: 'game:catchUno'; payload: { targetId: string } }
+  | { type: 'game:rematch'; payload: Record<string, never> }
+);
+
+export type ClientMessageType = ClientMessage['type'];
+
+export interface ErrorInfo {
+  code: string;
+  message: string;
+}
+
+export type RoomStatus = 'lobby' | 'playing' | 'finished';
+
+export interface RoomSettings {
+  turnSeconds: number;
+}
+
+export interface RoomPlayerView {
+  id: string;
+  name: string;
+  connected: boolean;
+  afk: boolean;
+}
+
+export interface RoomView {
+  code: string;
+  hostId: string;
+  status: RoomStatus;
+  settings: RoomSettings;
+  players: RoomPlayerView[];
+}
+
+export type ServerMessage =
+  | { type: 'ack'; requestId: string; ok: true }
+  | { type: 'ack'; requestId: string; ok: false; error: ErrorInfo }
+  | { type: 'welcome'; playerId: string; playerToken: string; roomCode: string }
+  | { type: 'room:state'; room: RoomView }
+  | { type: 'game:state'; game: PlayerView; stateVersion: number; deadline: number | null }
+  | { type: 'game:events'; events: GameEvent[] }
+  | { type: 'error'; error: ErrorInfo };
+
+export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 10;
+export const DEFAULT_TURN_SECONDS = 30;
+export const TURN_SECONDS_OPTIONS = [15, 30, 45, 60, 90] as const;
+export const AFK_STRIKES = 3;

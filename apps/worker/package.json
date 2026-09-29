@@ -1,0 +1,16 @@
+{
+  "name": "@nomercy/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types",
+    "test": "vitest run",
+    "typecheck": "tsc -p . && tsc -p test"
+  },
+  "dependencies": {
+    "@nomercy/engine": "*",
+    "zod": "^4.6.5"
+  }
+}

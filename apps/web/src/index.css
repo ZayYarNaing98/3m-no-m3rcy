@@ -1,0 +1,29 @@
+@import 'tailwindcss';
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
+  color: #f1f5f9;
+  background: radial-gradient(ellipse at top, #1e293b 0%, #020617 70%);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer components {
+  .btn-primary {
+    @apply rounded-2xl bg-gradient-to-r from-red-600 to-orange-500 px-5 py-3 font-bold shadow-lg shadow-red-900/40 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply rounded-2xl bg-white/10 px-5 py-3 font-semibold transition hover:bg-white/15 active:scale-[0.98] disabled:opacity-50;
+  }
+  .btn-danger {
+    @apply rounded-2xl bg-red-600 px-5 py-3 font-black transition hover:bg-red-500 active:scale-[0.98];
+  }
+  .input {
+    @apply rounded-2xl bg-white/10 px-4 py-3 outline-none ring-sky-400 placeholder:text-slate-500 focus:ring-2;
+  }
+}
