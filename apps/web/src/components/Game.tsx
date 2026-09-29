@@ -373,8 +373,9 @@ function MyHand({
         </button>
       </div>
 
-      <div data-anchor="hand" className="-mx-3 overflow-x-auto px-3 pt-3 pb-1">
-        <div className="flex w-max gap-1.5">
+      <div data-anchor="hand" className="pt-3 pb-1">
+        {/* Wrap onto more rows instead of scrolling; row gap leaves room for raised cards. */}
+        <div className="flex flex-wrap justify-center gap-x-1.5 gap-y-3">
           {game.hand.map((c) => {
             const dealIndex = fresh.indexOf(c.id);
             return (
