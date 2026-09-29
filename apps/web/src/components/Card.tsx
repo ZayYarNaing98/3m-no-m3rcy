@@ -151,7 +151,7 @@ function Glyph({ card, fill, scale, corner }: { card: CardT; fill: string; scale
   const sw = corner ? 5 : 3;
 
   // Shrink long corner labels (+4, +10) so they clear the border.
-  const cornerFit = (value: string) => (!corner ? 1 : value.length >= 3 ? 0.62 : value.length === 2 ? 0.8 : 1);
+  const cornerFit = (value: string) => (!corner ? 1 : value.length >= 3 ? 0.78 : value.length === 2 ? 0.8 : 1);
   const text = (value: string, size: number, dy = 0): ReactNode => (
     <text
       x="0"
@@ -164,7 +164,7 @@ function Glyph({ card, fill, scale, corner }: { card: CardT; fill: string; scale
       fontSize={size * cornerFit(value)}
       fill={fill}
       stroke={stroke}
-      strokeWidth={sw}
+      strokeWidth={sw * cornerFit(value)}
       paintOrder="stroke"
       strokeLinejoin="round"
     >
