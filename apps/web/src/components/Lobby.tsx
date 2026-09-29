@@ -2,6 +2,7 @@ import { MIN_PLAYERS, TURN_SECONDS_OPTIONS } from '@nomercy/engine';
 import { useState } from 'react';
 import { navigate } from '../App';
 import { useGame } from '../store';
+import { Avatar } from './Avatar';
 
 export function Lobby() {
   const { room, playerId, send, leave } = useGame();
@@ -35,7 +36,7 @@ export function Lobby() {
         <ul className="divide-y divide-white/5 rounded-2xl bg-white/5">
           {room.players.map((p) => (
             <li key={p.id} className="flex items-center gap-3 px-4 py-3">
-              <span className={`h-2 w-2 rounded-full ${p.connected ? 'bg-emerald-400' : 'bg-slate-600'}`} />
+              <Avatar name={p.name} size="sm" online={p.connected} />
               <span className="flex-1 truncate">
                 {p.name}
                 {p.id === playerId && <span className="text-slate-500"> (you)</span>}

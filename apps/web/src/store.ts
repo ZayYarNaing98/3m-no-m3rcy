@@ -21,6 +21,8 @@ interface State {
   stateVersion: number;
   deadline: number | null;
   log: string[];
+  /** Latest batch of game events, for animations. `seq` changes on every batch. */
+  fx: { seq: number; events: GameEvent[] };
   toast: string | null;
   closedReason: string | null;
 
@@ -72,6 +74,7 @@ export const useGame = create<State>((set, get) => ({
   stateVersion: 0,
   deadline: null,
   log: [],
+  fx: { seq: 0, events: [] },
   toast: null,
   closedReason: null,
 
@@ -197,6 +200,7 @@ function handleMessage(msg: ServerMessage) {
       break;
     case 'game:events':
       appendLog(msg.events);
+      set({ fx: { seq: get().fx.seq + 1, events: msg.events } });
       break;
     case 'error':
       get().showToast(msg.error.message);

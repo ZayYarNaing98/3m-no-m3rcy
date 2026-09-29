@@ -1,8 +1,10 @@
 import { COLORS, MERCY_LIMIT, type Color, type PlayerView, type PublicPlayer } from '@nomercy/engine';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../App';
 import { useGame } from '../store';
+import { Avatar } from './Avatar';
 import { Card, CardBack, COLOR_BG, COLOR_RING } from './Card';
+import { TableFx } from './TableFx';
 
 export function Game() {
   const { game, room, playerId, stateVersion, deadline, log, send } = useGame();
@@ -98,6 +100,7 @@ export function Game() {
       {confirmLeave && !finished && (
         <LeaveSheet forfeits={me?.status === 'active'} onCancel={() => setConfirmLeave(false)} />
       )}
+      <TableFx />
     </div>
   );
 }
@@ -148,32 +151,43 @@ function Opponents({
         return (
           <div
             key={p.id}
-            className={`min-w-28 rounded-xl px-3 py-2 text-sm transition ${
+            data-anchor={`seat:${p.id}`}
+            className={`min-w-36 rounded-xl px-3 py-2 text-sm transition ${
               isTurn ? 'bg-white/15 ring-2 ring-amber-300' : 'bg-white/5'
-            } ${p.status !== 'active' ? 'opacity-50' : ''}`}
+            } ${p.status !== 'active' ? 'opacity-60' : ''}`}
           >
-            <div className="flex items-center gap-1.5">
-              <span className={`h-1.5 w-1.5 rounded-full ${connected.get(p.id) ? 'bg-emerald-400' : 'bg-slate-600'}`} />
-              <span className="flex-1 truncate font-semibold">{p.name}</span>
-              {p.status === 'eliminated' && <span className="text-xs text-red-400">OUT</span>}
-              {p.status === 'won' && <span className="text-xs text-amber-300">WON</span>}
-            </div>
-            {p.status === 'active' && (
-              <>
-                <div className="mt-1 flex items-center justify-between text-xs text-slate-300">
-                  <span>{p.cardCount} cards</span>
-                  {p.calledUno && p.cardCount <= 2 && <span className="font-bold text-yellow-300">UNO!</span>}
+            <div className="flex items-center gap-2.5">
+              <Avatar
+                name={p.name}
+                size="md"
+                online={connected.get(p.id) ?? false}
+                active={isTurn}
+                dimmed={p.status === 'eliminated'}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="flex-1 truncate font-semibold">{p.name}</span>
+                  {p.status === 'eliminated' && <span className="text-xs font-bold text-red-400">OUT</span>}
+                  {p.status === 'won' && <span className="text-xs font-bold text-amber-300">WON</span>}
                 </div>
-                <MercyBar count={p.cardCount} />
-                {catchable && (
-                  <button
-                    className="mt-1.5 w-full rounded-md bg-red-600 py-0.5 text-xs font-bold hover:bg-red-500"
-                    onClick={() => onCatch(p.id)}
-                  >
-                    Catch! +2
-                  </button>
+                {p.status === 'active' && (
+                  <>
+                    <div className="flex items-center justify-between text-xs text-slate-300">
+                      <span>{p.cardCount} cards</span>
+                      {p.calledUno && p.cardCount <= 2 && <span className="font-bold text-yellow-300">UNO!</span>}
+                    </div>
+                    <MercyBar count={p.cardCount} />
+                  </>
                 )}
-              </>
+              </div>
+            </div>
+            {catchable && (
+              <button
+                className="mt-1.5 w-full rounded-md bg-red-600 py-0.5 text-xs font-bold hover:bg-red-500"
+                onClick={() => onCatch(p.id)}
+              >
+                Catch! +2
+              </button>
             )}
           </div>
         );
@@ -214,6 +228,7 @@ function Table({
   return (
     <div className="flex items-center justify-center gap-6 py-4 sm:gap-10">
       <button
+        data-anchor="draw"
         className={`rounded-2xl transition ${canDraw ? 'hover:-translate-y-1' : 'cursor-default opacity-80'}`}
         onClick={canDraw ? onDraw : undefined}
         aria-label={`Draw pile, ${game.drawPileCount} cards`}
@@ -223,8 +238,11 @@ function Table({
       </button>
 
       <div className="relative flex flex-col items-center">
-        <div className={`rounded-3xl p-1.5 ring-4 ${COLOR_RING[game.activeColor]}`}>
-          <Card card={game.topCard} size="lg" wildColor={game.topCard.color ? undefined : game.activeColor} />
+        <div data-anchor="discard" className={`rounded-3xl p-1.5 ring-4 transition-shadow ${COLOR_RING[game.activeColor]}`}>
+          {/* Keyed by card so each newly played card lands with an animation. */}
+          <div key={game.topCard.id} className={game.turn > 1 ? 'animate-land' : ''}>
+            <Card card={game.topCard} size="lg" wildColor={game.topCard.color ? undefined : game.activeColor} />
+          </div>
         </div>
         {stack > 0 && (
           <span className="absolute -top-3 -right-4 animate-bounce rounded-full bg-red-600 px-2.5 py-1 text-sm font-black shadow-lg">
@@ -328,9 +346,18 @@ function MyHand({
   const drawn = phase.kind === 'drawingUntilPlayable' ? phase.drawnCardId : undefined;
   const canUno = game.hand.length <= 2 && !me.calledUno;
 
+  // Cards that weren't in the hand last render get a deal-in animation.
+  const seen = useRef<Set<string> | null>(null);
+  const previous = seen.current;
+  const fresh = previous ? game.hand.filter((c) => !previous.has(c.id)).map((c) => c.id) : [];
+  useEffect(() => {
+    seen.current = new Set(game.hand.map((c) => c.id));
+  });
+
   return (
     <div className="rounded-3xl bg-white/5 p-3">
       <div className="mb-2 flex items-center gap-2 text-sm">
+        <Avatar name={me.name} size="sm" active={myTurn} />
         <span className="font-semibold">You · {game.hand.length} cards</span>
         <div className="flex-1">
           <MercyBar count={game.hand.length} />
@@ -346,17 +373,26 @@ function MyHand({
         </button>
       </div>
 
-      <div className="-mx-3 overflow-x-auto px-3 pt-3 pb-1">
+      <div data-anchor="hand" className="-mx-3 overflow-x-auto px-3 pt-3 pb-1">
         <div className="flex w-max gap-1.5">
-          {game.hand.map((c) => (
-            <Card
-              key={c.id}
-              card={c}
-              playable={myTurn ? legal.has(c.id) : undefined}
-              onClick={myTurn && legal.has(c.id) ? () => onPlay(c.id) : undefined}
-              size={game.hand.length > 15 ? 'sm' : 'md'}
-            />
-          ))}
+          {game.hand.map((c) => {
+            const dealIndex = fresh.indexOf(c.id);
+            return (
+              <span
+                key={c.id}
+                data-card-id={c.id}
+                className={dealIndex >= 0 ? 'animate-deal' : ''}
+                style={dealIndex >= 0 ? { animationDelay: `${200 + Math.min(dealIndex, 8) * 70}ms` } : undefined}
+              >
+                <Card
+                  card={c}
+                  playable={myTurn ? legal.has(c.id) : undefined}
+                  onClick={myTurn && legal.has(c.id) ? () => onPlay(c.id) : undefined}
+                  size={game.hand.length > 15 ? 'sm' : 'md'}
+                />
+              </span>
+            );
+          })}
         </div>
       </div>
 
@@ -393,8 +429,9 @@ function SwapSheet({ players, onPick }: { players: PublicPlayer[]; onPick: (id: 
     <Sheet title="Swap hands with…" subtitle="You played a 7. Pick a player to trade your whole hand with.">
       <div className="flex flex-col gap-2">
         {players.map((p) => (
-          <button key={p.id} className="btn-secondary flex justify-between" onClick={() => onPick(p.id)}>
-            <span>{p.name}</span>
+          <button key={p.id} className="btn-secondary flex items-center gap-3" onClick={() => onPick(p.id)}>
+            <Avatar name={p.name} size="sm" />
+            <span className="flex-1 text-left">{p.name}</span>
             <span className="text-slate-400">{p.cardCount} cards</span>
           </button>
         ))}
@@ -431,10 +468,10 @@ function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
     <Sheet title={winner ? `${name(winner.id)} ${winner.id === playerId ? 'win' : 'wins'}!` : 'Round over'}>
       <ol className="space-y-1 text-sm">
         {ranking.map((id, i) => (
-          <li key={id} className="flex justify-between rounded-lg bg-white/5 px-3 py-1.5">
-            <span>
-              {i + 1}. {name(id)}
-            </span>
+          <li key={id} className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5">
+            <span className="w-4 text-slate-400">{i + 1}</span>
+            <Avatar name={game.players.find((p) => p.id === id)?.name ?? '?'} size="xs" />
+            <span className="flex-1">{name(id)}</span>
             <span className="text-slate-400">
               {game.eliminationOrder.includes(id) ? 'eliminated' : i === 0 ? 'winner' : `${game.players.find((p) => p.id === id)?.cardCount} cards`}
             </span>
