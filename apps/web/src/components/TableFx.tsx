@@ -1,6 +1,6 @@
 import type { Card as CardT } from '@nomercy/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { playCardDraw } from '../sound';
+import { playCardDraw, playCardPlay } from '../sound';
 import { useGame } from '../store';
 import { Card, CardBack } from './Card';
 
@@ -90,6 +90,8 @@ export function TableFx() {
           const from = (e.playerId === playerId ? cardRect(e.card.id) : null) ?? seatOf(e.playerId);
           const to = anchorRect('discard');
           if (from && to) newFlights.push({ id: nextId++, from, to, card: e.card, delay: t });
+          // Slap as the flying card lands on the pile.
+          playCardPlay(t + FLIGHT_MS * 0.85);
           t += 120;
           break;
         }

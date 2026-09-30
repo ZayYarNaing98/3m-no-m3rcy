@@ -81,3 +81,39 @@ export function playCardDraw(delayMs = 0): void {
   src.start(t);
   src.stop(t + 0.2);
 }
+
+/** A card slapped onto the discard pile: a low thud with a soft snap. */
+export function playCardPlay(delayMs = 0): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+
+  const t = c.currentTime + delayMs / 1000;
+
+  // Snap: a very short burst of low-passed noise.
+  const snap = c.createBufferSource();
+  snap.buffer = noiseBuffer(c);
+  const lowpass = c.createBiquadFilter();
+  lowpass.type = 'lowpass';
+  lowpass.frequency.value = 2400;
+  const snapGain = c.createGain();
+  snapGain.gain.setValueAtTime(0.0001, t);
+  snapGain.gain.exponentialRampToValueAtTime(0.4, t + 0.004);
+  snapGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+  snap.connect(lowpass).connect(snapGain).connect(c.destination);
+  snap.start(t);
+  snap.stop(t + 0.1);
+
+  // Thud: a quick downward sine sweep for weight.
+  const thud = c.createOscillator();
+  thud.type = 'sine';
+  thud.frequency.setValueAtTime(170, t);
+  thud.frequency.exponentialRampToValueAtTime(80, t + 0.09);
+  const thudGain = c.createGain();
+  thudGain.gain.setValueAtTime(0.0001, t);
+  thudGain.gain.exponentialRampToValueAtTime(0.45, t + 0.006);
+  thudGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+  thud.connect(thudGain).connect(c.destination);
+  thud.start(t);
+  thud.stop(t + 0.14);
+}
