@@ -1,4 +1,4 @@
-import { COLORS, MERCY_LIMIT, type Color, type PlayerView, type PublicPlayer } from '@nomercy/engine';
+import { COLORS, MERCY_LIMIT, REACTIONS, type Color, type PlayerView, type PublicPlayer } from '@nomercy/engine';
 import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../App';
 import { useGame } from '../store';
@@ -75,6 +75,8 @@ export function Game() {
         </ul>
       )}
 
+      {playerId && <ReactionBar />}
+
       <div className="mt-auto">
         {me && me.status === 'active' ? (
           <MyHand
@@ -114,6 +116,31 @@ export function Game() {
         <LeaveSheet forfeits={me?.status === 'active'} onCancel={() => setConfirmLeave(false)} />
       )}
       <TableFx />
+    </div>
+  );
+}
+
+function ReactionBar() {
+  const react = useGame((s) => s.react);
+  return (
+    <div className="flex justify-center">
+      <div
+        data-anchor="reactions"
+        className="flex flex-wrap justify-center gap-1 rounded-full bg-white/5 px-2 py-1.5 ring-1 ring-white/10"
+        role="group"
+        aria-label="Send a reaction"
+      >
+        {REACTIONS.map((emoji) => (
+          <button
+            key={emoji}
+            className="flex h-10 w-10 items-center justify-center rounded-full text-2xl transition hover:scale-125 hover:bg-white/10 active:scale-95"
+            onClick={() => react(emoji)}
+            aria-label={`React ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

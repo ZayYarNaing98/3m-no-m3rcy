@@ -17,6 +17,7 @@ export type ClientMessage = { requestId?: string } & (
   | { type: 'game:callUno'; payload: Record<string, never> }
   | { type: 'game:catchUno'; payload: { targetId: string } }
   | { type: 'game:rematch'; payload: Record<string, never> }
+  | { type: 'room:react'; payload: { emoji: Reaction } }
 );
 
 export type ClientMessageType = ClientMessage['type'];
@@ -54,6 +55,7 @@ export type ServerMessage =
   | { type: 'room:state'; room: RoomView }
   | { type: 'game:state'; game: PlayerView; stateVersion: number; deadline: number | null }
   | { type: 'game:events'; events: GameEvent[] }
+  | { type: 'reaction'; playerId: string; emoji: Reaction }
   | { type: 'error'; error: ErrorInfo };
 
 export const MIN_PLAYERS = 2;
@@ -61,3 +63,9 @@ export const MAX_PLAYERS = 10;
 export const DEFAULT_TURN_SECONDS = 30;
 export const TURN_SECONDS_OPTIONS = [15, 30, 45, 60, 90] as const;
 export const AFK_STRIKES = 3;
+
+/** Emoji players can send to the table. The server only relays these. */
+export const REACTIONS = ['😂', '😱', '😡', '😭', '🔥', '👏', '😈', '💀'] as const;
+export type Reaction = (typeof REACTIONS)[number];
+/** Minimum gap between one player's reactions. */
+export const REACTION_COOLDOWN_MS = 600;

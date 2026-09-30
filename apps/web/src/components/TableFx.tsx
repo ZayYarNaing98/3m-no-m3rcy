@@ -21,7 +21,7 @@ interface Float {
   id: number;
   at: DOMRect;
   text: string;
-  tone: 'bad' | 'good' | 'info';
+  tone: 'bad' | 'good' | 'info' | 'emoji';
   delay: number;
 }
 
@@ -53,6 +53,22 @@ export function TableFx() {
   const [flights, setFlights] = useState<Flight[]>([]);
   const [floats, setFloats] = useState<Float[]>([]);
   const lastSeq = useRef(fx.seq);
+  const reaction = useGame((s) => s.reaction);
+  const lastReaction = useRef(reaction?.seq ?? 0);
+
+  // Emoji reactions float up over the sender (or the emoji bar for your own if you have no hand).
+  useEffect(() => {
+    if (!reaction || reaction.seq === lastReaction.current) return;
+    lastReaction.current = reaction.seq;
+    const at =
+      (reaction.playerId === playerId ? anchorRect('hand') : anchorRect(`seat:${reaction.playerId}`)) ??
+      anchorRect('reactions');
+    if (!at) return;
+    // Nudge sideways a little so rapid reactions don't stack exactly on top of each other.
+    const jitter = ((reaction.seq * 37) % 60) - 30;
+    const shifted = new DOMRect(at.x + jitter, at.y, at.width, at.height);
+    setFloats((f) => [...f, { id: nextId++, at: shifted, text: reaction.emoji, tone: 'emoji', delay: 0 }]);
+  }, [reaction, playerId]);
 
   useEffect(() => {
     if (fx.seq === lastSeq.current) return;
@@ -187,13 +203,16 @@ const TONES: Record<Float['tone'], string> = {
   bad: 'bg-red-600 text-white',
   good: 'bg-yellow-400 text-slate-900',
   info: 'bg-slate-100 text-slate-900',
+  emoji: 'bg-transparent text-5xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]',
 };
 
 function FloatingText({ float, onDone }: { float: Float; onDone: () => void }) {
   const { at, text, tone, delay } = float;
   return (
     <span
-      className={`animate-float-up absolute rounded-full px-3 py-1 text-sm font-black whitespace-nowrap shadow-xl ${TONES[tone]}`}
+      className={`animate-float-up absolute rounded-full whitespace-nowrap ${
+        tone === 'emoji' ? '' : 'px-3 py-1 text-sm font-black shadow-xl'
+      } ${TONES[tone]}`}
       style={{ left: at.left + at.width / 2, top: at.top + Math.min(at.height, 60) / 2, animationDelay: `${delay}ms` }}
       onAnimationEnd={onDone}
     >

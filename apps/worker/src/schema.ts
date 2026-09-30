@@ -1,4 +1,4 @@
-import { COLORS, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
+import { COLORS, REACTIONS, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
 import { z } from 'zod';
 
 const id = z.string().min(1).max(64);
@@ -33,6 +33,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   msg('game:callUno', empty),
   msg('game:catchUno', z.object({ targetId: id })),
   msg('game:rematch', empty),
+  msg('room:react', z.object({ emoji: z.enum(REACTIONS) })),
 ]);
 
 export function parseClientMessage(raw: string): ClientMessage | { error: string; requestId?: string } {

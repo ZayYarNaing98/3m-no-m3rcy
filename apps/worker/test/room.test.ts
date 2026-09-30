@@ -160,3 +160,24 @@ describe('room persistence and timers', () => {
     expect(events.events[0]?.type).toBe('timedOut');
   });
 });
+
+describe('reactions', () => {
+  it('relays allowed emoji to everyone and rejects others and spam', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const b = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    await b.request('room:join', { name: 'Ben' });
+    const welcome = await a.waitFor((m): m is Extract<ServerMessage, { type: 'welcome' }> => m.type === 'welcome');
+
+    expect((await a.request('room:react', { emoji: '🔥' })).ok).toBe(true);
+    const got = await b.waitFor((m): m is Extract<ServerMessage, { type: 'reaction' }> => m.type === 'reaction');
+    expect(got).toEqual({ type: 'reaction', playerId: welcome.playerId, emoji: '🔥' });
+
+    const spam = await a.request('room:react', { emoji: '😂' });
+    expect(spam).toMatchObject({ ok: false, error: { code: 'slow_down' } });
+
+    const bad = await b.request('room:react', { emoji: '🍕' });
+    expect(bad).toMatchObject({ ok: false, error: { code: 'bad_message' } });
+  });
+});

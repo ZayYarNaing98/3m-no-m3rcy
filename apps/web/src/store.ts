@@ -1,4 +1,4 @@
-import type { ErrorInfo, GameEvent, PlayerView, RoomView, ServerMessage } from '@nomercy/engine';
+import type { ErrorInfo, GameEvent, PlayerView, Reaction, RoomView, ServerMessage } from '@nomercy/engine';
 import { create } from 'zustand';
 import { describeEvent } from './events';
 
@@ -23,6 +23,8 @@ interface State {
   log: string[];
   /** Latest batch of game events, for animations. `seq` changes on every batch. */
   fx: { seq: number; events: GameEvent[] };
+  /** Latest emoji reaction from anyone at the table. */
+  reaction: { seq: number; playerId: string; emoji: Reaction } | null;
   toast: string | null;
   closedReason: string | null;
 
@@ -31,6 +33,7 @@ interface State {
   send(type: string, payload?: object): Promise<Ack>;
   join(name: string): Promise<Ack>;
   leave(): Promise<void>;
+  react(emoji: Reaction): Promise<Ack>;
   showToast(message: string): void;
 }
 
@@ -75,6 +78,7 @@ export const useGame = create<State>((set, get) => ({
   deadline: null,
   log: [],
   fx: { seq: 0, events: [] },
+  reaction: null,
   toast: null,
   closedReason: null,
 
@@ -166,6 +170,10 @@ export const useGame = create<State>((set, get) => ({
     get().disconnect();
   },
 
+  react(emoji) {
+    return get().send('room:react', { emoji });
+  },
+
   showToast(message) {
     clearTimeout(toastTimer);
     set({ toast: message });
@@ -201,6 +209,9 @@ function handleMessage(msg: ServerMessage) {
     case 'game:events':
       appendLog(msg.events);
       set({ fx: { seq: get().fx.seq + 1, events: msg.events } });
+      break;
+    case 'reaction':
+      set({ reaction: { seq: (get().reaction?.seq ?? 0) + 1, playerId: msg.playerId, emoji: msg.emoji } });
       break;
     case 'error':
       get().showToast(msg.error.message);

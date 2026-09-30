@@ -8,6 +8,7 @@ import {
   EngineError,
   MAX_PLAYERS,
   MIN_PLAYERS,
+  REACTION_COOLDOWN_MS,
   playerView,
   type Action,
   type ClientMessage,
@@ -64,6 +65,8 @@ class RoomError extends Error {
 export class Room extends DurableObject<Env> {
   private room: RoomRecord | null = null;
   private rate = new WeakMap<WebSocket, { windowStart: number; count: number }>();
+  /** Last reaction time per player; in memory only, so it resets on hibernation. */
+  private lastReaction = new Map<string, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -219,6 +222,19 @@ export class Room extends DurableObject<Env> {
           s.close(4001, 'Removed by host');
         }
         break;
+      }
+
+      case 'room:react': {
+        const seat = this.requireSeat(me);
+        const now = Date.now();
+        if (now - (this.lastReaction.get(seat.id) ?? 0) < REACTION_COOLDOWN_MS) {
+          throw new RoomError('slow_down', 'One reaction at a time');
+        }
+        this.lastReaction.set(seat.id, now);
+        const reaction: ServerMessage = { type: 'reaction', playerId: seat.id, emoji: msg.payload.emoji };
+        for (const ws of this.ctx.getWebSockets()) this.send(ws, reaction);
+        // Reactions are fire-and-forget: nothing to save or re-broadcast.
+        return;
       }
 
       case 'room:settings':
