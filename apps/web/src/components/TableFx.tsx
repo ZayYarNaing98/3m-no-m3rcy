@@ -1,5 +1,6 @@
 import type { Card as CardT } from '@nomercy/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { playCardDraw } from '../sound';
 import { useGame } from '../store';
 import { Card, CardBack } from './Card';
 
@@ -73,7 +74,6 @@ export function TableFx() {
   useEffect(() => {
     if (fx.seq === lastSeq.current) return;
     lastSeq.current = fx.seq;
-    if (reducedMotion()) return;
 
     const seatOf = (id: string) => anchorRect(id === playerId ? 'hand' : `seat:${id}`);
     const newFlights: Flight[] = [];
@@ -99,8 +99,10 @@ export function TableFx() {
           const shown = Math.min(e.count, MAX_FLIGHTS_PER_DRAW);
           const from = anchorRect('draw');
           const to = seatOf(e.playerId);
-          if (from && to) {
-            for (let i = 0; i < shown; i++) newFlights.push({ id: nextId++, from, to, delay: t + i * 70 });
+          for (let i = 0; i < shown; i++) {
+            // One flick per card, timed to the card leaving the pile.
+            playCardDraw(t + i * 70);
+            if (from && to) newFlights.push({ id: nextId++, from, to, delay: t + i * 70 });
           }
           float(to, `+${e.count}`, 'bad', t + 150);
           t += shown * 70;
@@ -134,6 +136,8 @@ export function TableFx() {
       }
     }
 
+    // Sounds still play with reduced motion; only the movement is skipped.
+    if (reducedMotion()) return;
     if (newFlights.length) setFlights((f) => [...f, ...newFlights]);
     if (newFloats.length) setFloats((f) => [...f, ...newFloats]);
   }, [fx, playerId]);

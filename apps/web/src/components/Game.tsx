@@ -1,6 +1,7 @@
 import { COLORS, MERCY_LIMIT, REACTIONS, type Color, type PlayerView, type PublicPlayer } from '@nomercy/engine';
 import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../App';
+import { setSoundEnabled, soundEnabled } from '../sound';
 import { useGame } from '../store';
 import { Avatar } from './Avatar';
 import { Card, CardBack, COLOR_BG, COLOR_RING } from './Card';
@@ -31,6 +32,7 @@ export function Game() {
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
         <RoomCodeChip code={room.code} />
         <span className="flex items-center gap-2">
+          <SoundToggle />
           <span className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-slate-100 ring-1 ring-white/15">
             Turn <span className="tabular-nums">{game.turn}</span>
           </span>
@@ -172,6 +174,24 @@ function ReactionPicker() {
         </div>
       )}
     </div>
+  );
+}
+
+function SoundToggle() {
+  const [on, setOn] = useState(soundEnabled);
+  return (
+    <button
+      className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-base ring-1 ring-white/15 transition hover:bg-white/15"
+      onClick={() => {
+        setSoundEnabled(!on);
+        setOn(!on);
+      }}
+      aria-pressed={on}
+      aria-label={on ? 'Mute sound' : 'Unmute sound'}
+      title={on ? 'Sound on' : 'Sound off'}
+    >
+      {on ? '🔊' : '🔇'}
+    </button>
   );
 }
 
