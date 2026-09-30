@@ -273,7 +273,10 @@ describe('colour roulette', () => {
     expectCode(() => applyAction(s, 'p0', { type: 'chooseColor', color: R }), 'not_your_turn');
     const r = applyAction(s, 'p1', { type: 'rouletteColor', color: B });
     expect(r.events).toContainEqual({ type: 'colorChosen', playerId: 'p1', color: B });
-    expect(r.events).toContainEqual({ type: 'rouletteFlip', playerId: 'p1', color: B, count: 3 });
+    const flip = r.events.find((e) => e.type === 'rouletteFlip');
+    expect(flip).toMatchObject({ playerId: 'p1', color: B, count: 3 });
+    // The flipped cards are revealed, ending on the named colour.
+    expect(flip?.type === 'rouletteFlip' && flip.cards.map((c) => c.color)).toEqual([R, G, B]);
     expect(r.state.players[1]?.hand).toHaveLength(4);
     expect(r.state.activeColor).toBe(B);
     expect(r.state.currentIndex).toBe(2);

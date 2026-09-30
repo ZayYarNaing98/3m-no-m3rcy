@@ -87,7 +87,8 @@ export type GameEvent =
   | { type: 'discardedAll'; playerId: string; color: Color; count: number }
   | { type: 'handsSwapped'; a: string; b: string }
   | { type: 'handsRotated'; direction: 1 | -1 }
-  | { type: 'rouletteFlip'; playerId: string; color: Color; count: number }
+  /** `cards` are the flipped cards, which are shown face-up to everyone. */
+  | { type: 'rouletteFlip'; playerId: string; color: Color; count: number; cards: Card[] }
   | { type: 'eliminated'; playerId: string; cardCount: number }
   | { type: 'unoCalled'; playerId: string }
   | { type: 'unoCaught'; playerId: string; byId: string }

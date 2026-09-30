@@ -363,16 +363,17 @@ function roulette(ctx: Ctx, color: Color): void {
   // The named colour becomes the colour in play.
   s.activeColor = color;
   events.push({ type: 'colorChosen', playerId: p.id, color });
-  let count = 0;
+  const flipped: Card[] = [];
   for (;;) {
     const c = drawOne(ctx);
     if (!c) break;
     p.hand.push(c);
-    count++;
+    flipped.push(c);
+    // Wild cards have no colour, so they never stop the roulette.
     if (c.color === color) break;
   }
   if (p.hand.length > 2) p.calledUno = false;
-  events.push({ type: 'rouletteFlip', playerId: p.id, color, count });
+  events.push({ type: 'rouletteFlip', playerId: p.id, color, count: flipped.length, cards: flipped });
   checkMercy(ctx);
   // The roulette victim loses their turn.
   endTurn(ctx);

@@ -16,6 +16,8 @@ interface Flight {
   to: DOMRect;
   card?: CardT;
   delay: number;
+  /** Colour Roulette: the card rises face-up, pauses so everyone sees it, then goes to the player. */
+  reveal?: boolean;
 }
 
 interface Float {
@@ -27,6 +29,9 @@ interface Float {
 }
 
 const FLIGHT_MS = 380;
+const REVEAL_MS = 950;
+const REVEAL_GAP_MS = 260;
+const MAX_REVEALS = 10;
 const MAX_FLIGHTS_PER_DRAW = 6;
 /** Size of a flying card: matches the md card (w-16, 2:3). */
 const CARD_W = 64;
@@ -111,8 +116,21 @@ export function TableFx() {
           t += 120;
           break;
         }
-        case 'drew':
         case 'rouletteFlip': {
+          if (e.count <= 0) break;
+          // Show the flipped cards face-up one by one. For long runs, show the first few and the match.
+          const cards = e.cards.length > MAX_REVEALS ? [...e.cards.slice(0, MAX_REVEALS - 1), e.cards.at(-1)!] : e.cards;
+          const from = anchorRect('draw');
+          const to = seatOf(e.playerId);
+          cards.forEach((card, i) => {
+            playCardDraw(t + i * REVEAL_GAP_MS);
+            if (from && to) newFlights.push({ id: nextId++, from, to, card, delay: t + i * REVEAL_GAP_MS, reveal: true });
+          });
+          t += cards.length * REVEAL_GAP_MS;
+          float(to, `+${e.count}`, 'bad', t + 400);
+          break;
+        }
+        case 'drew': {
           if (e.count <= 0) break;
           const shown = Math.min(e.count, MAX_FLIGHTS_PER_DRAW);
           const from = anchorRect('draw');
@@ -175,7 +193,7 @@ export function TableFx() {
 
 function FlyingCard({ flight, onDone }: { flight: Flight; onDone: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { from, to, card, delay } = flight;
+  const { from, to, card, delay, reveal } = flight;
 
   // Each flight animates once, from the rects captured when it was created.
   useLayoutEffect(() => {
@@ -187,7 +205,16 @@ function FlyingCard({ flight, onDone }: { flight: Flight; onDone: () => void }) 
     const dy = to.top + to.height / 2 - (from.top + from.height / 2);
     // Played cards land almost straight; drawn cards spin a little on the way.
     const spin = card ? -6 : dx > 0 ? 18 : -18;
-    const anim = el.animate(
+    // Roulette reveal: lift out of the pile face-up, hold so it can be read, then fly to the player.
+    const keyframes: Keyframe[] | null = reveal
+      ? [
+          { transform: 'translate(0, 0) scale(0.9)', opacity: 1 },
+          { transform: 'translate(0, -70px) scale(1.25)', opacity: 1, offset: 0.3 },
+          { transform: 'translate(0, -70px) scale(1.25)', opacity: 1, offset: 0.6 },
+          { transform: `translate(${dx}px, ${dy}px) scale(0.55) rotate(${dx > 0 ? 12 : -12}deg)`, opacity: 0.35 },
+        ]
+      : null;
+    const anim = el.animate(keyframes ??
       [
         { transform: `translate(0, 0) scale(${card ? fromScale : 0.9}) rotate(0deg)`, opacity: 1 },
         {
@@ -200,7 +227,7 @@ function FlyingCard({ flight, onDone }: { flight: Flight; onDone: () => void }) 
           opacity: card ? 1 : 0.2,
         },
       ],
-      { duration: FLIGHT_MS, delay, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'both' },
+      { duration: reveal ? REVEAL_MS : FLIGHT_MS, delay, easing: 'cubic-bezier(.3,.7,.3,1)', fill: 'both' },
     );
     anim.finished.then(onDone, () => {});
     return () => anim.cancel();

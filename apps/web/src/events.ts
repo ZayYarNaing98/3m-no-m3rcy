@@ -39,8 +39,11 @@ export function describeEvent(e: GameEvent, name: (id: string) => string): strin
       return `${name(e.a)} swapped hands with ${name(e.b)}`;
     case 'handsRotated':
       return 'Everyone passed their hand';
-    case 'rouletteFlip':
-      return `${name(e.playerId)} flipped ${e.count} looking for ${e.color}`;
+    case 'rouletteFlip': {
+      const shown = e.cards.slice(0, 6).map(cardName).join(', ');
+      const more = e.cards.length > 6 ? ` +${e.cards.length - 6} more` : '';
+      return `${name(e.playerId)} flipped ${e.count} looking for ${e.color}: ${shown}${more}`;
+    }
     case 'eliminated':
       return `${name(e.playerId)} hit ${e.cardCount} cards and is out — no mercy`;
     case 'unoCalled':
