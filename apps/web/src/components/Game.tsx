@@ -75,8 +75,6 @@ export function Game() {
         </ul>
       )}
 
-      {playerId && <ReactionBar />}
-
       <div className="mt-auto">
         {me && me.status === 'active' ? (
           <MyHand
@@ -89,9 +87,10 @@ export function Game() {
             onUno={() => send('game:callUno')}
           />
         ) : (
-          <p className="py-6 text-center text-slate-400">
-            {me?.status === 'eliminated' ? "You're out — no mercy. Watch the carnage." : 'Spectating'}
-          </p>
+          <div className="flex items-center justify-center gap-3 py-6 text-slate-400">
+            <p>{me?.status === 'eliminated' ? "You're out — no mercy. Watch the carnage." : 'Spectating'}</p>
+            {me && <ReactionPicker />}
+          </div>
         )}
       </div>
 
@@ -120,27 +119,58 @@ export function Game() {
   );
 }
 
-function ReactionBar() {
+/** A smiley toggle that opens a small emoji panel above it. */
+function ReactionPicker() {
   const react = useGame((s) => s.react);
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+
+  // Close on a click outside the picker or on Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    addEventListener('pointerdown', onDown);
+    addEventListener('keydown', onKey);
+    return () => {
+      removeEventListener('pointerdown', onDown);
+      removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   return (
-    <div className="flex justify-center">
-      <div
-        data-anchor="reactions"
-        className="flex flex-wrap justify-center gap-1 rounded-full bg-white/5 px-2 py-1.5 ring-1 ring-white/10"
-        role="group"
-        aria-label="Send a reaction"
+    <div ref={box} className="relative" data-anchor="reactions">
+      <button
+        className={`flex h-7 w-7 items-center justify-center rounded-full text-base transition ${
+          open ? 'bg-white/25 ring-1 ring-white/40' : 'bg-white/10 hover:bg-white/20'
+        }`}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-label={open ? 'Close reactions' : 'Send a reaction'}
+        title="Reactions"
       >
-        {REACTIONS.map((emoji) => (
-          <button
-            key={emoji}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-2xl transition hover:scale-125 hover:bg-white/10 active:scale-95"
-            onClick={() => react(emoji)}
-            aria-label={`React ${emoji}`}
-          >
-            {emoji}
-          </button>
-        ))}
-      </div>
+        {open ? '✕' : '😊'}
+      </button>
+      {open && (
+        <div
+          role="group"
+          aria-label="Send a reaction"
+          className="absolute right-0 bottom-full z-20 mb-2 grid grid-cols-4 gap-1 rounded-2xl bg-slate-800 p-2 shadow-2xl ring-1 ring-white/15"
+        >
+          {REACTIONS.map((emoji) => (
+            <button
+              key={emoji}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-2xl transition hover:scale-125 hover:bg-white/10 active:scale-95"
+              onClick={() => react(emoji)}
+              aria-label={`React ${emoji}`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -447,6 +477,7 @@ function MyHand({
         >
           UNO!
         </button>
+        <ReactionPicker />
       </div>
 
       <div data-anchor="hand" className="pt-3 pb-1">
