@@ -28,9 +28,12 @@ const INK = '#141414';
 const FONT = "'Arial Black', 'Helvetica Neue', Arial, sans-serif";
 
 const SIZES = {
+  xs: 'w-6',
   sm: 'w-11',
   md: 'w-16',
   lg: 'w-24',
+  /** Centre piles on the table: smaller on phones. */
+  table: 'w-16 sm:w-24',
 };
 
 // Card geometry, in a 100 x 150 viewBox.

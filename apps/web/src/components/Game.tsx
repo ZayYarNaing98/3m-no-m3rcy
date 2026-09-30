@@ -51,14 +51,16 @@ export function Game() {
         </span>
       </div>
 
-      <Opponents
-        players={opponents}
+      <PokerTable
         game={game}
+        opponents={opponents}
+        me={me}
         onCatch={(id) => send('game:catchUno', { targetId: id })}
         canCatch={me?.status === 'active'}
+        canDraw={canDraw}
+        onDraw={draw}
+        deadline={finished ? null : deadline}
       />
-
-      <Table game={game} canDraw={canDraw} onDraw={draw} deadline={finished ? null : deadline} />
 
       <StatusLine game={game} myTurn={myTurn} current={current} isMe={(id) => id === playerId} />
 
@@ -249,68 +251,245 @@ function LeaveSheet({ forfeits, onCancel }: { forfeits: boolean; onCancel: () =>
   );
 }
 
-function Opponents({
-  players,
+/**
+ * Poker-style oval table: a padded rail around green felt, opponents seated
+ * around the top of the oval in play order (clockwise from your left), a fan of
+ * face-down cards in front of each, the piles in the middle and you at the bottom.
+ */
+function PokerTable({
   game,
+  opponents,
+  me,
   onCatch,
   canCatch,
+  canDraw,
+  onDraw,
+  deadline,
 }: {
-  players: PublicPlayer[];
   game: PlayerView;
+  opponents: PublicPlayer[];
+  me: PublicPlayer | undefined;
   onCatch: (id: string) => void;
   canCatch: boolean;
+  canDraw: boolean;
+  onDraw: () => void;
+  deadline: number | null;
 }) {
   const room = useGame((s) => s.room);
   const connected = new Map(room?.players.map((p) => [p.id, p.connected]) ?? []);
+  const wide = useWide();
+  // Matches the table's aspect ratio (2:1 wide, 3:4 on phones).
+  // Busy phone tables use compact seats and more of the rail (further down the sides).
+  const compact = !wide && opponents.length > 5;
+  const angles = seatAngles(opponents.length, wide ? 2 : 0.75, compact ? 58 : 35);
+  const fanSize = opponents.length > 6 ? 3 : 5;
+  const onRail = (i: number, rx: number, ry: number) => ({
+    left: `${50 + rx * Math.cos(angles[i] ?? 0)}%`,
+    top: `${50 - ry * Math.sin(angles[i] ?? 0)}%`,
+  });
+
   return (
-    <div className="flex flex-wrap justify-center gap-2">
-      {players.map((p) => {
-        const isTurn = p.id === game.currentPlayerId && p.status === 'active';
-        const catchable = canCatch && p.status === 'active' && p.cardCount === 1 && !p.calledUno;
-        return (
-          <div
-            key={p.id}
-            data-anchor={`seat:${p.id}`}
-            className={`min-w-36 rounded-xl px-3 py-2 text-sm transition ${
-              isTurn ? 'bg-white/15 ring-2 ring-amber-300' : 'bg-white/5'
-            } ${p.status !== 'active' ? 'opacity-60' : ''}`}
-          >
-            <div className="flex items-center gap-2.5">
-              <Avatar
-                name={p.name}
-                size="md"
-                online={connected.get(p.id) ?? false}
-                active={isTurn}
-                dimmed={p.status === 'eliminated'}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="flex-1 truncate font-semibold">{p.name}</span>
-                  {p.status === 'eliminated' && <span className="text-xs font-bold text-red-400">OUT</span>}
-                  {p.status === 'won' && <span className="text-xs font-bold text-amber-300">WON</span>}
+    // Side padding leaves room for seats that hang over the rail.
+    <div className="px-10 pt-14 pb-10 sm:px-16 sm:pt-8">
+      <div className="relative mx-auto aspect-[3/4] w-full max-w-3xl sm:aspect-[2/1]">
+        {/* Rail */}
+        <div className="absolute inset-0 rounded-[50%] bg-gradient-to-b from-zinc-600 via-zinc-800 to-zinc-950 shadow-[0_24px_60px_rgba(0,0,0,0.65)] ring-1 ring-white/10" />
+        {/* Felt */}
+        <div className="absolute inset-[12px] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#24a055_0%,#177a40_55%,#0d4f29_100%)] shadow-[inset_0_0_60px_rgba(0,0,0,0.55)] sm:inset-[18px]" />
+        {/* Inner line */}
+        <div className="absolute inset-[11%] rounded-[50%] border-2 border-white/10" />
+
+        {/* Face-down fans in front of each opponent (hidden on phones to keep the centre clear) */}
+        {opponents.map((p, i) =>
+          p.status === 'active' && p.cardCount > 0 ? (
+            <div
+              key={`fan-${p.id}`}
+              className="absolute hidden -translate-x-1/2 -translate-y-1/2 sm:flex"
+              style={onRail(i, 36, 33)}
+              aria-hidden="true"
+            >
+              {Array.from({ length: Math.min(p.cardCount, fanSize) }, (_, j) => (
+                <div
+                  key={j}
+                  className="-ml-3 first:ml-0"
+                  style={{ transform: `rotate(${(j - (Math.min(p.cardCount, fanSize) - 1) / 2) * 12}deg)` }}
+                >
+                  <CardBack size="xs" />
                 </div>
-                {p.status === 'active' && (
-                  <>
-                    <div className="flex items-center justify-between text-xs text-slate-300">
-                      <span>{p.cardCount} cards</span>
-                      {p.calledUno && p.cardCount <= 2 && <span className="font-bold text-yellow-300">UNO!</span>}
-                    </div>
-                    <MercyBar count={p.cardCount} />
-                  </>
-                )}
-              </div>
+              ))}
             </div>
-            {catchable && (
-              <button
-                className="mt-1.5 w-full rounded-md bg-red-600 py-0.5 text-xs font-bold hover:bg-red-500"
-                onClick={() => onCatch(p.id)}
-              >
-                Catch! +2
-              </button>
-            )}
+          ) : null,
+        )}
+
+        {/* Centre piles */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <TableCenter game={game} canDraw={canDraw} onDraw={onDraw} deadline={deadline} />
+        </div>
+
+        {/* Opponent seats on the rail */}
+        {opponents.map((p, i) => (
+          <div key={p.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={onRail(i, wide ? 50 : 53, 49)}>
+            <Seat
+              player={p}
+              isTurn={p.id === game.currentPlayerId && p.status === 'active'}
+              online={connected.get(p.id) ?? false}
+              catchable={canCatch && p.status === 'active' && p.cardCount === 1 && !p.calledUno}
+              onCatch={() => onCatch(p.id)}
+              compact={compact}
+            />
           </div>
-        );
-      })}
+        ))}
+
+        {/* You, at the bottom of the rail */}
+        {me && (
+          <div className="absolute top-full left-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="flex items-center gap-2 rounded-full bg-zinc-900/95 py-1 pr-3 pl-1 whitespace-nowrap shadow-lg ring-1 ring-white/15">
+              <Avatar
+                name={me.name}
+                size="sm"
+                active={me.id === game.currentPlayerId && me.status === 'active'}
+                dimmed={me.status === 'eliminated'}
+              />
+              <span className="text-sm font-bold">You</span>
+              <span className="text-xs text-slate-400">{me.cardCount} cards</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** True on screens at least 640px wide (Tailwind's `sm`). */
+function useWide(): boolean {
+  const query = '(min-width: 640px)';
+  const [wide, setWide] = useState(() => matchMedia(query).matches);
+  useEffect(() => {
+    const mq = matchMedia(query);
+    const onChange = () => setWide(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  return wide;
+}
+
+/**
+ * Angles (radians) for k seats spaced evenly by distance along the rail, from
+ * bottom-left over the top to bottom-right, leaving the bottom for you.
+ * Even spacing by angle would bunch seats on the steep ends of the oval.
+ */
+function seatAngles(k: number, aspect: number, belowSides: number): number[] {
+  // The arc runs from `belowSides` degrees under the left end, over the top, to the same under the right.
+  const start = ((180 + belowSides) * Math.PI) / 180;
+  const end = (-belowSides * Math.PI) / 180;
+  const steps = 360;
+  const ts: number[] = [];
+  const lengths: number[] = [0];
+  for (let j = 0; j <= steps; j++) ts.push(start + ((end - start) * j) / steps);
+  for (let j = 1; j <= steps; j++) {
+    const a = ts[j - 1] as number;
+    const b = ts[j] as number;
+    const dx = aspect * (Math.cos(b) - Math.cos(a));
+    const dy = Math.sin(b) - Math.sin(a);
+    lengths.push((lengths[j - 1] as number) + Math.hypot(dx, dy));
+  }
+  const total = lengths.at(-1) as number;
+  return Array.from({ length: k }, (_, i) => {
+    const target = (total * (i + 1)) / (k + 1);
+    const j = lengths.findIndex((l) => l >= target);
+    return ts.at(Math.max(j, 0)) as number;
+  });
+}
+
+function Seat({
+  player: p,
+  isTurn,
+  online,
+  catchable,
+  onCatch,
+  compact,
+}: {
+  player: PublicPlayer;
+  isTurn: boolean;
+  online: boolean;
+  catchable: boolean;
+  onCatch: () => void;
+  /** Avatar with a count badge and a small name, for crowded phone tables. */
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <div
+        data-anchor={`seat:${p.id}`}
+        className={`flex w-14 flex-col items-center ${p.status !== 'active' ? 'opacity-60' : ''}`}
+      >
+        <div className="relative">
+          <Avatar name={p.name} size="sm" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
+          <span
+            className={`absolute -right-2 -bottom-1 rounded-full px-1 text-[0.6rem] font-black ring-2 ring-slate-900 ${
+              p.status !== 'active'
+                ? 'bg-red-600 text-white'
+                : p.cardCount >= 20
+                  ? 'bg-red-500 text-white'
+                  : 'bg-white text-slate-900'
+            }`}
+          >
+            {p.status === 'won' ? 'WON' : p.status === 'eliminated' ? 'OUT' : p.cardCount}
+          </span>
+        </div>
+        <div
+          className={`mt-1 max-w-full truncate rounded px-1 text-[0.65rem] font-bold ${
+            isTurn ? 'bg-amber-300 text-slate-900' : 'bg-zinc-900/90'
+          }`}
+        >
+          {p.name}
+        </div>
+        {p.status === 'active' && p.calledUno && p.cardCount <= 2 && (
+          <div className="text-[0.6rem] font-black text-yellow-300">UNO!</div>
+        )}
+        {catchable && (
+          <button className="mt-0.5 rounded bg-red-600 px-1 text-[0.6rem] font-bold" onClick={onCatch}>
+            Catch!
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-anchor={`seat:${p.id}`}
+      className={`flex w-20 flex-col items-center sm:w-24 ${p.status !== 'active' ? 'opacity-60' : ''}`}
+    >
+      <Avatar name={p.name} size="md" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
+      <div
+        className={`-mt-2 w-full rounded-lg px-2 pt-2.5 pb-1.5 text-center shadow-lg ring-1 ${
+          isTurn ? 'bg-zinc-900 ring-amber-300' : 'bg-zinc-900/95 ring-white/15'
+        }`}
+      >
+        <div className="truncate text-xs font-bold">{p.name}</div>
+        {p.status === 'active' ? (
+          <>
+            <div className="flex items-center justify-center gap-1 text-[0.7rem] text-slate-300">
+              <span>{p.cardCount} cards</span>
+              {p.calledUno && p.cardCount <= 2 && <span className="font-black text-yellow-300">UNO!</span>}
+            </div>
+            <MercyBar count={p.cardCount} />
+          </>
+        ) : (
+          <div className={`text-[0.7rem] font-black ${p.status === 'won' ? 'text-amber-300' : 'text-red-400'}`}>
+            {p.status === 'won' ? 'WON' : 'OUT'}
+          </div>
+        )}
+      </div>
+      {catchable && (
+        <button
+          className="mt-1 w-full rounded-md bg-red-600 py-0.5 text-xs font-bold shadow-lg hover:bg-red-500"
+          onClick={onCatch}
+        >
+          Catch! +2
+        </button>
+      )}
     </div>
   );
 }
@@ -332,7 +511,7 @@ function MercyBar({ count }: { count: number }) {
   );
 }
 
-function Table({
+function TableCenter({
   game,
   canDraw,
   onDraw,
@@ -345,22 +524,22 @@ function Table({
 }) {
   const stack = game.phase.kind === 'respondToStack' ? game.phase.pending : 0;
   return (
-    <div className="flex items-center justify-center gap-6 py-4 sm:gap-10">
+    <div className="flex items-center justify-center gap-3 sm:gap-8">
       <button
         data-anchor="draw"
         className={`rounded-2xl transition ${canDraw ? 'hover:-translate-y-1' : 'cursor-default opacity-80'}`}
         onClick={canDraw ? onDraw : undefined}
         aria-label={`Draw pile, ${game.drawPileCount} cards`}
       >
-        <CardBack size="lg" />
-        <span className="mt-1 block text-xs text-slate-400">{game.drawPileCount} left</span>
+        <CardBack size="table" />
+        <span className="mt-1 block text-xs font-semibold text-emerald-100/80">{game.drawPileCount} left</span>
       </button>
 
       <div className="relative flex flex-col items-center">
-        <div data-anchor="discard" className={`rounded-3xl p-1.5 ring-4 transition-shadow ${COLOR_RING[game.activeColor]}`}>
+        <div data-anchor="discard" className={`rounded-2xl p-1 ring-4 transition-shadow sm:rounded-3xl sm:p-1.5 ${COLOR_RING[game.activeColor]}`}>
           {/* Keyed by card so each newly played card lands with an animation. */}
           <div key={game.topCard.id} className={game.turn > 1 ? 'animate-land' : ''}>
-            <Card card={game.topCard} size="lg" wildColor={game.topCard.color ? undefined : game.activeColor} />
+            <Card card={game.topCard} size="table" wildColor={game.topCard.color ? undefined : game.activeColor} />
           </div>
         </div>
         {stack > 0 && (
@@ -368,10 +547,10 @@ function Table({
             +{stack}
           </span>
         )}
-        <span className="mt-1 text-xs text-slate-400 capitalize">{game.activeColor}</span>
+        <span className="mt-1 text-xs font-semibold text-emerald-100/80 capitalize">{game.activeColor}</span>
       </div>
 
-      <div className="flex flex-col items-center gap-2 text-slate-400">
+      <div className="flex flex-col items-center gap-2 text-emerald-100/80">
         <span className="text-3xl" aria-label={game.direction === 1 ? 'Clockwise' : 'Counter-clockwise'}>
           {game.direction === 1 ? '↻' : '↺'}
         </span>

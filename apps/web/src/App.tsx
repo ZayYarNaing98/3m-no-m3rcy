@@ -4,6 +4,7 @@ import { Game } from './components/Game';
 import { Home } from './components/Home';
 import { JoinForm } from './components/JoinForm';
 import { Lobby } from './components/Lobby';
+import { TablePreview } from './components/TablePreview';
 import { useGame } from './store';
 
 const ROOM_PATH = /^\/r\/([A-Za-z0-9]{6})\/?$/;
@@ -27,6 +28,7 @@ export function App() {
   }, []);
 
   if (import.meta.env.DEV && location.pathname === '/cards') return <CardGallery />;
+  if (import.meta.env.DEV && location.pathname === '/table') return <TablePreview />;
 
   return (
     <>
