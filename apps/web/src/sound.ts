@@ -117,3 +117,38 @@ export function playCardPlay(delayMs = 0): void {
   thud.start(t);
   thud.stop(t + 0.14);
 }
+
+/** Someone called UNO: a bright two-note rising chime. */
+export function playUnoCall(delayMs = 0): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+
+  const t = c.currentTime + delayMs / 1000;
+  const note = (freq: number, start: number, length: number) => {
+    const osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, start);
+    // A soft octave overtone makes it ring like a bell.
+    const overtone = c.createOscillator();
+    overtone.type = 'sine';
+    overtone.frequency.setValueAtTime(freq * 2, start);
+    const overtoneGain = c.createGain();
+    overtoneGain.gain.value = 0.25;
+
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.3, start + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+
+    osc.connect(gain);
+    overtone.connect(overtoneGain).connect(gain);
+    gain.connect(c.destination);
+    osc.start(start);
+    overtone.start(start);
+    osc.stop(start + length + 0.02);
+    overtone.stop(start + length + 0.02);
+  };
+  note(784, t, 0.14); // G5
+  note(1175, t + 0.11, 0.32); // D6
+}
