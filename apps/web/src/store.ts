@@ -10,6 +10,7 @@ import {
 } from '@nomercy/engine';
 import { create } from 'zustand';
 import { describeEvent } from './events';
+import { scheduleEvents } from './fxTiming';
 
 type Conn = 'idle' | 'connecting' | 'open' | 'closed';
 type Ack = { ok: true } | { ok: false; error: ErrorInfo };
@@ -207,7 +208,44 @@ export const useGame = create<State>((set, get) => ({
   },
 }));
 
+// Table state (game and room) can be held back briefly so an elimination or a
+// win plays out on screen before seats change and the results sheet appears.
+let holdUntil = 0;
+let held: Partial<State> | null = null;
+let holdTimer: ReturnType<typeof setTimeout> | undefined;
+
+function setTable(update: Partial<State>) {
+  const wait = holdUntil - Date.now();
+  if (wait <= 0) {
+    useGame.setState(update);
+    return;
+  }
+  held = { ...held, ...update };
+  clearTimeout(holdTimer);
+  holdTimer = setTimeout(() => {
+    const pending = held;
+    held = null;
+    if (pending) useGame.setState(pending);
+  }, wait);
+}
+
+function clearHold() {
+  holdUntil = 0;
+  held = null;
+  clearTimeout(holdTimer);
+}
+
+function holdForClimax(events: GameEvent[]) {
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const { climax } = scheduleEvents(events);
+  if (climax === null) return;
+  // A win also gets time for "Winner!" and the fanfare before the results sheet.
+  const extra = events.some((e) => e.type === 'won') ? 900 : 50;
+  holdUntil = Math.max(holdUntil, Date.now() + climax + extra);
+}
+
 function freshRoom() {
+  clearHold();
   return {
     ready: false,
     playerId: null,
@@ -238,15 +276,21 @@ function handleMessage(msg: ServerMessage) {
       break;
     }
     case 'room:state':
-      set({ room: msg.room });
+      setTable({ room: msg.room });
       break;
     case 'game:state':
-      set({ game: msg.game, stateVersion: msg.stateVersion, deadline: msg.deadline });
+      setTable({ game: msg.game, stateVersion: msg.stateVersion, deadline: msg.deadline });
       break;
-    case 'game:events':
-      appendLog(msg.events);
+    case 'game:events': {
+      // "Out" and "won" lines wait for their moment on screen, like the table does.
+      const { at } = scheduleEvents(msg.events);
+      const climaxes: GameEvent[] = msg.events.filter((e) => e.type === 'eliminated' || e.type === 'won');
+      appendLog(msg.events.filter((e) => !climaxes.includes(e)));
+      for (const e of climaxes) setTimeout(() => appendLog([e]), at[msg.events.indexOf(e)] ?? 0);
       set({ fx: { seq: get().fx.seq + 1, events: msg.events } });
+      holdForClimax(msg.events);
       break;
+    }
     case 'chat:history':
       set({ chat: msg.messages });
       break;

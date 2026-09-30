@@ -6,9 +6,19 @@ import {
   playEliminated,
   playReaction,
   playRoundWon,
+  playStackGrew,
   playUnoCall,
   playUnoCaught,
 } from '../sound';
+import {
+  DRAW_GAP_MS,
+  FLIGHT_MS,
+  MAX_FLIGHTS_PER_DRAW,
+  REVEAL_GAP_MS,
+  REVEAL_MS,
+  revealedCards,
+  scheduleEvents,
+} from '../fxTiming';
 import { useGame } from '../store';
 import { Card, CardBack } from './Card';
 
@@ -36,11 +46,6 @@ interface Float {
   delay: number;
 }
 
-const FLIGHT_MS = 380;
-const REVEAL_MS = 950;
-const REVEAL_GAP_MS = 260;
-const MAX_REVEALS = 10;
-const MAX_FLIGHTS_PER_DRAW = 6;
 /** Size of a flying card: matches the md card (w-16, 2:3). */
 const CARD_W = 64;
 const CARD_H = 96;
@@ -108,13 +113,15 @@ export function TableFx() {
     const seatOf = (id: string) => anchorRect(id === playerId ? 'hand' : `seat:${id}`);
     const newFlights: Flight[] = [];
     const newFloats: Float[] = [];
-    let t = 0;
+    // Shared with the store, which holds back the next table state until eliminations and wins are shown.
+    const { at } = scheduleEvents(fx.events);
 
-    const float = (at: DOMRect | null, text: string, tone: Float['tone'], delay = t) => {
-      if (at) newFloats.push({ id: nextId++, at, text, tone, delay });
-    };
+    fx.events.forEach((e, index) => {
+      const t = at[index] ?? 0;
+      const float = (rect: DOMRect | null, text: string, tone: Float['tone'], delay = t) => {
+        if (rect) newFloats.push({ id: nextId++, at: rect, text, tone, delay });
+      };
 
-    for (const e of fx.events) {
       switch (e.type) {
         case 'played': {
           const from = (e.playerId === playerId ? cardRect(e.card.id) : null) ?? seatOf(e.playerId);
@@ -122,21 +129,23 @@ export function TableFx() {
           if (from && to) newFlights.push({ id: nextId++, from, to, card: e.card, delay: t });
           // Slap as the flying card lands on the pile.
           playCardPlay(t + FLIGHT_MS * 0.85);
-          t += 120;
           break;
         }
+        case 'stackGrew':
+          // Lands just after the draw card's slap.
+          playStackGrew(e.total, t + FLIGHT_MS * 0.85 + 60);
+          break;
         case 'rouletteFlip': {
           if (e.count <= 0) break;
           // Show the flipped cards face-up one by one. For long runs, show the first few and the match.
-          const cards = e.cards.length > MAX_REVEALS ? [...e.cards.slice(0, MAX_REVEALS - 1), e.cards.at(-1)!] : e.cards;
+          const cards = revealedCards(e.cards);
           const from = anchorRect('draw');
           const to = seatOf(e.playerId);
           cards.forEach((card, i) => {
             playCardDraw(t + i * REVEAL_GAP_MS);
             if (from && to) newFlights.push({ id: nextId++, from, to, card, delay: t + i * REVEAL_GAP_MS, reveal: true });
           });
-          t += cards.length * REVEAL_GAP_MS;
-          float(to, `+${e.count}`, 'bad', t + 400);
+          float(to, `+${e.count}`, 'bad', t + cards.length * REVEAL_GAP_MS + 400);
           break;
         }
         case 'drew': {
@@ -146,11 +155,10 @@ export function TableFx() {
           const to = seatOf(e.playerId);
           for (let i = 0; i < shown; i++) {
             // One flick per card, timed to the card leaving the pile.
-            playCardDraw(t + i * 70);
-            if (from && to) newFlights.push({ id: nextId++, from, to, delay: t + i * 70 });
+            playCardDraw(t + i * DRAW_GAP_MS);
+            if (from && to) newFlights.push({ id: nextId++, from, to, delay: t + i * DRAW_GAP_MS });
           }
           float(to, `+${e.count}`, 'bad', t + 150);
-          t += shown * 70;
           break;
         }
         case 'skipped':
@@ -175,15 +183,16 @@ export function TableFx() {
           float(seatOf(e.playerId), 'Caught!', 'bad');
           break;
         case 'eliminated':
-          playEliminated(t + 300);
-          float(seatOf(e.playerId), 'OUT!', 'bad', t + 300);
+          // Scheduled after the cards that caused it have landed.
+          playEliminated(t);
+          float(seatOf(e.playerId), 'OUT!', 'bad');
           break;
         case 'won':
-          playRoundWon(t + 200);
-          float(seatOf(e.playerId), 'Winner!', 'good', t + 200);
+          playRoundWon(t);
+          float(seatOf(e.playerId), 'Winner!', 'good');
           break;
       }
-    }
+    });
 
     // Sounds still play with reduced motion; only the movement is skipped.
     if (reducedMotion()) return;

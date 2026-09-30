@@ -331,3 +331,22 @@ export function playEliminated(delayMs = 0): void {
   blip(c, { type: 'sawtooth', from: 160, to: 45, start: t + 0.05, length: 0.9, peak: 0.2, lowpass: 600 });
   blip(c, { type: 'sawtooth', from: 164, to: 46, start: t + 0.05, length: 0.9, peak: 0.12, lowpass: 600 });
 }
+
+/**
+ * A draw card was played: a heavy rising "whoomp". The bigger the stack total,
+ * the higher and more intense it gets, so +14 sounds scarier than +2.
+ */
+export function playStackGrew(total: number, delayMs = 0): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+
+  const t = c.currentTime + delayMs / 1000;
+  const intensity = Math.min(total / 20, 1);
+  const top = Math.min(220 + total * 30, 900);
+  // Thump underneath.
+  noiseBurst(c, { start: t, length: 0.12, peak: 0.3, type: 'lowpass', from: 400 });
+  // Rising sweep, with a detuned twin that thickens as the stack grows.
+  blip(c, { type: 'sawtooth', from: 90, to: top, start: t, length: 0.32, peak: 0.14 + intensity * 0.08, lowpass: 1400 });
+  blip(c, { type: 'sawtooth', from: 92, to: top * 1.01, start: t, length: 0.32, peak: 0.04 + intensity * 0.1, lowpass: 1400 });
+}
