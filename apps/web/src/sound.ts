@@ -152,3 +152,32 @@ export function playUnoCall(delayMs = 0): void {
   note(784, t, 0.14); // G5
   note(1175, t + 0.11, 0.32); // D6
 }
+
+/** Someone was caught without calling UNO: a low, descending "wah-wah" buzzer. */
+export function playUnoCaught(delayMs = 0): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+
+  const t = c.currentTime + delayMs / 1000;
+  const note = (from: number, to: number, start: number, length: number) => {
+    const osc = c.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(from, start);
+    osc.frequency.exponentialRampToValueAtTime(to, start + length);
+    // Soften the buzzy sawtooth so it reads as "oops", not an alarm.
+    const lowpass = c.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = 900;
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.22, start + 0.02);
+    gain.gain.setValueAtTime(0.22, start + length * 0.7);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+    osc.connect(lowpass).connect(gain).connect(c.destination);
+    osc.start(start);
+    osc.stop(start + length + 0.02);
+  };
+  note(311, 294, t, 0.22); // E♭4, sagging
+  note(233, 196, t + 0.24, 0.42); // B♭3 sliding down to G3
+}
