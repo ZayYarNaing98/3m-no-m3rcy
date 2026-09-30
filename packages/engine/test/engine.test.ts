@@ -267,12 +267,15 @@ describe('colour roulette', () => {
       drawTop: [[R, 'number', 2], [G, 'number', 3], [B, 'number', 4]],
     });
     s = applyAction(s, 'p0', { type: 'play', cardId: cardId(s, 0, 'wildColorRoulette') }).state;
-    s = applyAction(s, 'p0', { type: 'chooseColor', color: R }).state;
+    // The player who played it does not pick a colour; the next player names it.
     expect(s.phase.kind).toBe('rouletteNameColor');
     expect(s.currentIndex).toBe(1);
+    expectCode(() => applyAction(s, 'p0', { type: 'chooseColor', color: R }), 'not_your_turn');
     const r = applyAction(s, 'p1', { type: 'rouletteColor', color: B });
+    expect(r.events).toContainEqual({ type: 'colorChosen', playerId: 'p1', color: B });
     expect(r.events).toContainEqual({ type: 'rouletteFlip', playerId: 'p1', color: B, count: 3 });
     expect(r.state.players[1]?.hand).toHaveLength(4);
+    expect(r.state.activeColor).toBe(B);
     expect(r.state.currentIndex).toBe(2);
   });
 });

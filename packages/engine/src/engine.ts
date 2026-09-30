@@ -197,7 +197,8 @@ function play(ctx: Ctx, cardId: string): void {
 
   if (p.hand.length === 0) return declareWinner(ctx, p);
 
-  if (isWild(card)) {
+  // Colour Roulette is the one wild whose player doesn't pick: the next player names the colour.
+  if (isWild(card) && card.kind.type !== 'wildColorRoulette') {
     s.carriedStack = carried;
     s.phase = { kind: 'chooseColor', cardId: card.id };
     return;
@@ -359,6 +360,9 @@ function roulette(ctx: Ctx, color: Color): void {
   const { s, events } = ctx;
   if (!COLORS.includes(color)) throw new EngineError('bad_color', 'Unknown colour');
   const p = current(s);
+  // The named colour becomes the colour in play.
+  s.activeColor = color;
+  events.push({ type: 'colorChosen', playerId: p.id, color });
   let count = 0;
   for (;;) {
     const c = drawOne(ctx);

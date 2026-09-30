@@ -132,7 +132,7 @@ export function Game() {
       {myTurn && phase.kind === 'rouletteNameColor' && (
         <ColorSheet
           title="Colour Roulette! Name a colour"
-          subtitle="You flip cards until that colour shows up, and keep them all."
+          subtitle="You flip cards until that colour shows up and keep them all. Your colour then becomes the colour in play."
           onPick={(color) => send('game:rouletteColor', { color })}
         />
       )}

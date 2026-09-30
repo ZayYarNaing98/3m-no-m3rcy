@@ -40,5 +40,5 @@ The app is served at `https://em-no-mercy.<your-subdomain>.workers.dev`.
 
 - Stacking accepts any draw card of equal or higher value (+2 ≤ +4 ≤ +6 ≤ +10), regardless of colour.
 - The first discard is always a number card.
-- Colour Roulette: the next player names a colour, flips until it appears, keeps every flipped card, and loses their turn.
+- Colour Roulette: the player who plays it doesn't pick a colour. The next player names one, flips until it appears, keeps every flipped card, and loses their turn; the named colour becomes the colour in play.
 - A timed-out player draws until playable but keeps the card; after 3 timeouts in a row their turns shrink to 3 seconds.
