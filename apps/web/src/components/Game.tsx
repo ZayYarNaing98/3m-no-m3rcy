@@ -28,6 +28,12 @@ export function Game() {
   const myIndex = game.players.findIndex((p) => p.id === playerId);
   const opponents = [...game.players.slice(myIndex + 1), ...game.players.slice(0, Math.max(myIndex, 0))];
 
+  // Spectators have no seat: they just disconnect, nothing is forfeited.
+  const stopWatching = () => {
+    useGame.getState().disconnect();
+    navigate('/');
+  };
+
   return (
     // Exactly one screen tall: the table flexes to fill what the header, status and hand leave.
     <div className="mx-auto flex h-dvh max-w-5xl flex-col gap-2 overflow-hidden p-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:gap-3 sm:p-3">
@@ -35,19 +41,28 @@ export function Game() {
         <RoomCodeChip code={room.code} />
         <span className="flex items-center gap-2">
           <SoundToggle />
+          {room.spectators > 0 && (
+            <span
+              className="rounded-full bg-white/10 px-2.5 py-1.5 font-semibold text-slate-100 ring-1 ring-white/15"
+              title={`${room.spectators} watching`}
+              aria-label={`${room.spectators} watching`}
+            >
+              👀 <span className="tabular-nums">{room.spectators}</span>
+            </span>
+          )}
           <span className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-slate-100 ring-1 ring-white/15">
             Turn <span className="tabular-nums">{game.turn}</span>
           </span>
           {!finished && (
             <button
               className="flex items-center gap-1.5 rounded-full bg-red-600/15 px-2.5 py-1.5 font-bold text-red-300 ring-1 ring-red-500/60 transition hover:bg-red-600 hover:text-white active:scale-[0.97] sm:px-3.5"
-              onClick={() => setConfirmLeave(true)}
-              aria-label="Leave game"
+              onClick={me ? () => setConfirmLeave(true) : stopWatching}
+              aria-label={me ? 'Leave game' : 'Stop watching'}
             >
               <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M12 14l4-4-4-4M16 10H8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              <span className="hidden sm:inline">Leave game</span>
+              <span className="hidden sm:inline">{me ? 'Leave game' : 'Stop watching'}</span>
             </button>
           )}
         </span>
@@ -99,8 +114,12 @@ export function Game() {
             onUno={() => send('game:callUno')}
           />
         ) : (
-          <div className="flex items-center justify-center gap-3 py-6 text-slate-400">
-            <p>{me?.status === 'eliminated' ? "You're out — no mercy. Watch the carnage." : 'Spectating'}</p>
+          <div className="flex items-center justify-center gap-3 px-2 py-4 text-center text-sm text-slate-400 sm:py-6 sm:text-base">
+            <p>
+              {me?.status === 'eliminated'
+                ? "You're out — no mercy. Watch the carnage."
+                : "👀 You're watching. Everyone's cards stay hidden."}
+            </p>
             {me && <ReactionPicker />}
             {me && <ChatButton />}
           </div>
@@ -808,6 +827,7 @@ function Sheet({ title, subtitle, children }: { title: string; subtitle?: string
 
 function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
   const { send, leave, playerId } = useGame();
+  const seated = game.players.some((p) => p.id === playerId);
   const winnerId = game.phase.kind === 'roundOver' ? game.phase.winnerId : undefined;
   const winner = game.players.find((p) => p.id === winnerId);
   const name = (id: string) => (id === playerId ? 'You' : (game.players.find((p) => p.id === id)?.name ?? '?'));
@@ -843,11 +863,13 @@ function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
         <button
           className="btn-secondary"
           onClick={async () => {
-            await leave();
+            // Spectators have no seat to give up; they just disconnect.
+            if (seated) await leave();
+            else useGame.getState().disconnect();
             navigate('/');
           }}
         >
-          Leave
+          {seated ? 'Leave' : 'Stop watching'}
         </button>
       </div>
     </Sheet>

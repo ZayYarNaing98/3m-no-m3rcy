@@ -226,3 +226,35 @@ describe('chat', () => {
     expect(await a.request('room:chat', { text: 'two' })).toMatchObject({ ok: false, error: { code: 'slow_down' } });
   });
 });
+
+describe('spectators', () => {
+  it('lets anyone with the code watch a started game without seeing hands', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const b = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    await b.request('room:join', { name: 'Ben' });
+    await a.request('game:start');
+
+    const watcher = await connect(code);
+    const view = await watcher.waitFor((m): m is Extract<ServerMessage, { type: 'game:state' }> => m.type === 'game:state');
+    expect(view.game.youId).toBeNull();
+    expect(view.game.hand).toEqual([]);
+    expect(view.game.players.map((p) => p.cardCount)).toEqual([7, 7]);
+
+    // Players see the watcher count go up.
+    await a.waitFor(
+      (m): m is Extract<ServerMessage, { type: 'room:state' }> => m.type === 'room:state' && m.room.spectators === 1,
+    );
+
+    // Watchers can't act or join mid-game.
+    expect(await watcher.request('game:draw', { stateVersion: view.stateVersion })).toMatchObject({
+      ok: false,
+      error: { code: 'not_seated' },
+    });
+    expect(await watcher.request('room:join', { name: 'Cy' })).toMatchObject({
+      ok: false,
+      error: { code: 'game_in_progress' },
+    });
+  });
+});

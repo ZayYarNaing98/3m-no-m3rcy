@@ -118,7 +118,8 @@ export class Room extends DurableObject<Env> {
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ playerId: null } satisfies SocketAttachment);
-    this.send(server, { type: 'room:state', room: this.roomView() });
+    // Everyone gets the new room view, so the watcher count stays current.
+    this.broadcastRoom();
     if (this.room.game) this.sendGame(server, null);
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -409,6 +410,7 @@ export class Room extends DurableObject<Env> {
         connected: connected.has(s.id),
         afk: s.afkStrikes >= AFK_STRIKES,
       })),
+      spectators: this.ctx.getWebSockets().filter((ws) => ws !== exclude && !this.attachment(ws).playerId).length,
     };
   }
 

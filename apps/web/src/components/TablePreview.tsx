@@ -7,6 +7,7 @@ export function TablePreview() {
   const params = new URLSearchParams(location.search);
   const n = Math.min(10, Math.max(2, Number(params.get('n')) || 6));
   const extra = Math.min(18, Math.max(0, Number(params.get('hand')) || 0));
+  const viewer = params.get('spectate') ? null : 'p0';
   const names = ['You', 'Seint', 'zay', 'Mya', 'Ko Ko', 'Thu', 'Aung', 'Hnin', 'Min', 'Su'];
   if (!useGame.getState().game) {
     let state = createGame(
@@ -33,8 +34,8 @@ export function TablePreview() {
     // Optionally give "You" extra cards to check big hands.
     if (extra) state = { ...state, players: state.players.map((p, i) => (i === 0 ? { ...p, hand: [...p.hand, ...state.drawPile.slice(0, extra)] } : p)) };
     useGame.setState({
-      playerId: 'p0',
-      game: playerView(state, 'p0'),
+      playerId: viewer,
+      game: playerView(state, viewer),
       deadline: Date.now() + 25_000,
       room: {
         code: 'PREV1E',
@@ -42,6 +43,7 @@ export function TablePreview() {
         status: 'playing',
         settings: { turnSeconds: 30 },
         players: names.slice(0, n).map((name, i) => ({ id: `p${i}`, name, connected: i !== 3, afk: false })),
+        spectators: Number(params.get('watching')) || 0,
       },
       log: ['Seint played red 4', 'zay drew 2', 'Mya played red Skip'],
     });

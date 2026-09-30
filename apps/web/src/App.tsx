@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CardGallery } from './components/CardGallery';
 import { Game } from './components/Game';
+import { HeroBanner } from './components/HeroBanner';
 import { Home } from './components/Home';
 import { JoinForm } from './components/JoinForm';
 import { Lobby } from './components/Lobby';
@@ -32,7 +33,7 @@ export function App() {
 
   return (
     <>
-      {code ? <RoomScreen code={code} /> : <Home />}
+      {code ? <RoomScreen key={code} code={code} /> : <Home />}
       <Toast />
     </>
   );
@@ -40,6 +41,7 @@ export function App() {
 
 function RoomScreen({ code }: { code: string }) {
   const { conn, ready, playerId, room, game, closedReason, connect } = useGame();
+  const [watching, setWatching] = useState(false);
 
   useEffect(() => {
     connect(code);
@@ -64,13 +66,22 @@ function RoomScreen({ code }: { code: string }) {
   }
   if (!playerId) {
     if (room.status !== 'lobby') {
+      if (watching && game) return <Game />;
       return (
-        <Centered>
-          <p className="text-lg">This game has already started.</p>
-          <button className="btn-secondary mt-6" onClick={() => navigate('/')}>
+        <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-4 p-6 text-center">
+          <HeroBanner />
+          <p className="mt-2 text-lg font-semibold">This game has already started.</p>
+          <p className="text-sm text-slate-400">
+            Room <span className="font-mono text-slate-100">{room.code}</span> · {room.players.length} players
+          </p>
+          <button className="btn-primary" onClick={() => setWatching(true)} disabled={!game}>
+            👀 Watch this game
+          </button>
+          <p className="text-xs text-slate-500">Spectators see the table live, but never anyone's cards.</p>
+          <button className="btn-secondary" onClick={() => navigate('/')}>
             Back home
           </button>
-        </Centered>
+        </div>
       );
     }
     return <JoinForm room={room} />;

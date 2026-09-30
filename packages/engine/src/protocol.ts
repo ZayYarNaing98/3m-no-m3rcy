@@ -47,6 +47,8 @@ export interface RoomView {
   status: RoomStatus;
   settings: RoomSettings;
   players: RoomPlayerView[];
+  /** Connections watching without a seat. */
+  spectators: number;
 }
 
 export type ServerMessage =
