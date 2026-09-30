@@ -62,7 +62,7 @@ export function Lobby() {
         </label>
         <select
           id="turn"
-          className="rounded-lg bg-slate-800 px-2 py-1 text-sm disabled:opacity-60"
+          className="rounded-lg bg-slate-800 px-2 py-1 text-base disabled:opacity-60 sm:text-sm"
           disabled={!isHost}
           value={room.settings.turnSeconds}
           onChange={(e) => send('room:settings', { turnSeconds: Number(e.target.value) })}

@@ -28,6 +28,35 @@ export function ChatButton() {
   );
 }
 
+/**
+ * On phones, keeps the chat sheet inside the part of the screen the keyboard
+ * leaves visible. iOS Safari doesn't resize the page for the keyboard, so a
+ * bottom-pinned sheet would otherwise sit underneath it.
+ */
+function useKeyboardSafeBox(active: boolean): { top: number; height: number } | null {
+  const [box, setBox] = useState<{ top: number; height: number } | null>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!active || !vv) return;
+    const update = () => {
+      if (matchMedia('(min-width: 640px)').matches) {
+        setBox(null);
+        return;
+      }
+      const height = Math.min(vv.height, Math.round(window.innerHeight * 0.7));
+      setBox({ top: vv.offsetTop + vv.height - height, height });
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, [active]);
+  return box;
+}
+
 function time(at: number): string {
   return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
@@ -39,15 +68,17 @@ export function ChatPanel() {
   const [sending, setSending] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
+  const box = useKeyboardSafeBox(chatOpen);
 
-  // Keep the newest message in view.
+  // Keep the newest message in view, including when the keyboard resizes the sheet.
   useEffect(() => {
     if (chatOpen) list.current?.scrollTo({ top: list.current.scrollHeight });
-  }, [chat.length, chatOpen]);
+  }, [chat.length, chatOpen, box?.height]);
 
   useEffect(() => {
     if (!chatOpen) return;
-    input.current?.focus();
+    // Don't pop the keyboard on phones just for opening chat to read it.
+    if (matchMedia('(min-width: 640px)').matches) input.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setChatOpen(false);
     addEventListener('keydown', onKey);
     return () => removeEventListener('keydown', onKey);
@@ -71,6 +102,7 @@ export function ChatPanel() {
       role="dialog"
       aria-label="Chat"
       className="fixed inset-x-0 bottom-0 z-40 flex h-[70vh] flex-col rounded-t-3xl bg-slate-900 shadow-2xl ring-1 ring-white/10 sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-full sm:w-80 sm:rounded-none sm:rounded-l-3xl"
+      style={box ? { top: box.top, height: box.height, bottom: 'auto' } : undefined}
     >
       <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <h2 className="font-bold">💬 Chat</h2>
@@ -110,7 +142,7 @@ export function ChatPanel() {
       <form onSubmit={submit} className="flex items-center gap-2 border-t border-white/10 p-3">
         <input
           ref={input}
-          className="input min-w-0 flex-1 py-2 text-sm"
+          className="input min-w-0 flex-1 py-2 text-base sm:text-sm"
           placeholder={playerId ? 'Message the table…' : 'Take a seat to chat'}
           maxLength={CHAT_MAX_LENGTH}
           value={text}
