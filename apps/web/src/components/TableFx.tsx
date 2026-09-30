@@ -1,6 +1,6 @@
 import type { Card as CardT } from '@nomercy/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { playCardDraw, playCardPlay, playRoundWon, playUnoCall, playUnoCaught } from '../sound';
+import { playCardDraw, playCardPlay, playReaction, playRoundWon, playUnoCall, playUnoCaught } from '../sound';
 import { useGame } from '../store';
 import { Card, CardBack } from './Card';
 
@@ -82,6 +82,7 @@ export function TableFx() {
   useEffect(() => {
     if (!reaction || reaction.seq === lastReaction.current) return;
     lastReaction.current = reaction.seq;
+    playReaction(reaction.emoji);
     const at =
       (reaction.playerId === playerId ? anchorRect('hand') : anchorRect(`seat:${reaction.playerId}`)) ??
       anchorRect('reactions');
