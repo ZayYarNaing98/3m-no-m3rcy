@@ -65,7 +65,12 @@ export const TURN_SECONDS_OPTIONS = [15, 30, 45, 60, 90] as const;
 export const AFK_STRIKES = 3;
 
 /** Emoji players can send to the table. The server only relays these. */
-export const REACTIONS = ['😂', '😱', '😡', '😭', '🔥', '👏', '😈', '💀'] as const;
+export const REACTIONS = [
+  '😂', '🤣', '😎', '😏',
+  '😱', '😭', '😡', '🤬',
+  '😈', '💀', '🤡', '🔥',
+  '👏', '🙏', '👍', '👎',
+] as const;
 export type Reaction = (typeof REACTIONS)[number];
 /** Minimum gap between one player's reactions. */
 export const REACTION_COOLDOWN_MS = 600;
