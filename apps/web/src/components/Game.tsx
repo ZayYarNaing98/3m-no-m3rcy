@@ -157,12 +157,12 @@ function ReactionPicker() {
         <div
           role="group"
           aria-label="Send a reaction"
-          className="absolute right-0 bottom-full z-20 mb-2 grid grid-cols-4 gap-1 rounded-2xl bg-slate-800 p-2 shadow-2xl ring-1 ring-white/15"
+          className="absolute right-0 bottom-full z-20 mb-2 grid w-max grid-cols-4 gap-1 rounded-2xl bg-slate-800 p-2 shadow-2xl ring-1 ring-white/15"
         >
           {REACTIONS.map((emoji) => (
             <button
               key={emoji}
-              className="flex h-10 w-10 items-center justify-center rounded-full text-2xl transition hover:scale-125 hover:bg-white/10 active:scale-95"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-2xl leading-none transition hover:scale-125 hover:bg-white/10 active:scale-95"
               onClick={() => react(emoji)}
               aria-label={`React ${emoji}`}
             >
