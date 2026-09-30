@@ -365,3 +365,33 @@ export function playSkip(everyone: boolean, delayMs = 0): void {
   swoosh(t);
   if (everyone) swoosh(t + 0.2);
 }
+
+/** Play direction reversed: a quick whirr that sweeps up and swings back down, like a U-turn. */
+export function playReverse(delayMs = 0): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+
+  const t = c.currentTime + delayMs / 1000;
+  const osc = c.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(420, t);
+  osc.frequency.exponentialRampToValueAtTime(1100, t + 0.16);
+  osc.frequency.exponentialRampToValueAtTime(380, t + 0.36);
+  // A fast wobble gives it the spinning "whirr".
+  const lfo = c.createOscillator();
+  lfo.frequency.value = 22;
+  const lfoDepth = c.createGain();
+  lfoDepth.gain.value = 40;
+  lfo.connect(lfoDepth).connect(osc.frequency);
+  const gain = c.createGain();
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+  gain.gain.setValueAtTime(0.2, t + 0.28);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+  osc.connect(gain).connect(c.destination);
+  osc.start(t);
+  lfo.start(t);
+  osc.stop(t + 0.42);
+  lfo.stop(t + 0.42);
+}

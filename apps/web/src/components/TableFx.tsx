@@ -5,6 +5,7 @@ import {
   playCardPlay,
   playEliminated,
   playReaction,
+  playReverse,
   playRoundWon,
   playSkip,
   playStackGrew,
@@ -164,7 +165,11 @@ export function TableFx() {
         }
         case 'skipped':
           // Just after the card that caused it lands; Skip Everyone skips more than one player.
-          playSkip(e.playerIds.length > 1, t + FLIGHT_MS * 0.85 + 60);
+          // A two-player Reverse also skips: let the reverse sound go first.
+          playSkip(
+            e.playerIds.length > 1,
+            t + FLIGHT_MS * 0.85 + 60 + (fx.events.some((x) => x.type === 'reversed') ? 380 : 0),
+          );
           for (const id of e.playerIds) float(seatOf(id), 'Skipped', 'info');
           break;
         case 'handsSwapped':
@@ -175,6 +180,7 @@ export function TableFx() {
           float(anchorRect('discard'), 'Hands passed!', 'info');
           break;
         case 'reversed':
+          playReverse(t + FLIGHT_MS * 0.85 + 60);
           float(anchorRect('discard'), 'Reverse!', 'info');
           break;
         case 'unoCalled':
