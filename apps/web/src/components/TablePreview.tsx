@@ -4,7 +4,9 @@ import { Game } from './Game';
 
 /** Dev-only page at /table?n=6 that renders the game table with a fake game. */
 export function TablePreview() {
-  const n = Math.min(10, Math.max(2, Number(new URLSearchParams(location.search).get('n')) || 6));
+  const params = new URLSearchParams(location.search);
+  const n = Math.min(10, Math.max(2, Number(params.get('n')) || 6));
+  const extra = Math.min(18, Math.max(0, Number(params.get('hand')) || 0));
   const names = ['You', 'Seint', 'zay', 'Mya', 'Ko Ko', 'Thu', 'Aung', 'Hnin', 'Min', 'Su'];
   if (!useGame.getState().game) {
     let state = createGame(
@@ -28,6 +30,8 @@ export function TablePreview() {
                 : ({ type: 'draw' } as const);
       state = applyAction(state, cur.id, action).state;
     }
+    // Optionally give "You" extra cards to check big hands.
+    if (extra) state = { ...state, players: state.players.map((p, i) => (i === 0 ? { ...p, hand: [...p.hand, ...state.drawPile.slice(0, extra)] } : p)) };
     useGame.setState({
       playerId: 'p0',
       game: playerView(state, 'p0'),

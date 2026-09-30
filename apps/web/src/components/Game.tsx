@@ -1,5 +1,5 @@
 import { COLORS, MERCY_LIMIT, REACTIONS, type Color, type PlayerView, type PublicPlayer } from '@nomercy/engine';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { navigate } from '../App';
 import { setSoundEnabled, soundEnabled } from '../sound';
 import { useGame } from '../store';
@@ -29,8 +29,9 @@ export function Game() {
   const opponents = [...game.players.slice(myIndex + 1), ...game.players.slice(0, Math.max(myIndex, 0))];
 
   return (
-    <div className="mx-auto flex min-h-full max-w-5xl flex-col gap-3 p-3 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+    // Exactly one screen tall: the table flexes to fill what the header, status and hand leave.
+    <div className="mx-auto flex h-dvh max-w-5xl flex-col gap-2 overflow-hidden p-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:gap-3 sm:p-3">
+      <div className="flex flex-none items-center justify-between gap-2 text-sm">
         <RoomCodeChip code={room.code} />
         <span className="flex items-center gap-2">
           <SoundToggle />
@@ -39,13 +40,14 @@ export function Game() {
           </span>
           {!finished && (
             <button
-              className="flex items-center gap-1.5 rounded-full bg-red-600/15 px-3.5 py-1.5 font-bold text-red-300 ring-1 ring-red-500/60 transition hover:bg-red-600 hover:text-white active:scale-[0.97]"
+              className="flex items-center gap-1.5 rounded-full bg-red-600/15 px-2.5 py-1.5 font-bold text-red-300 ring-1 ring-red-500/60 transition hover:bg-red-600 hover:text-white active:scale-[0.97] sm:px-3.5"
               onClick={() => setConfirmLeave(true)}
+              aria-label="Leave game"
             >
               <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M12 14l4-4-4-4M16 10H8" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Leave game
+              <span className="hidden sm:inline">Leave game</span>
             </button>
           )}
         </span>
@@ -65,8 +67,13 @@ export function Game() {
       <StatusLine game={game} myTurn={myTurn} current={current} isMe={(id) => id === playerId} />
 
       {log.length > 0 && (
+        <p className="flex-none truncate text-center text-xs font-semibold text-slate-200 sm:hidden [@media(max-height:820px)]:block">
+          {log.at(-1)}
+        </p>
+      )}
+      {log.length > 0 && (
         <ul
-          className="mx-auto w-full max-w-md space-y-1 rounded-2xl bg-white/5 px-4 py-2.5 text-center text-sm ring-1 ring-white/10"
+          className="mx-auto hidden w-full max-w-md flex-none space-y-1 rounded-2xl bg-white/5 px-4 py-2.5 text-center text-sm ring-1 ring-white/10 sm:block [@media(max-height:820px)]:hidden"
           aria-live="polite"
         >
           {log.slice(-3).map((line, i, shown) => (
@@ -80,7 +87,7 @@ export function Game() {
         </ul>
       )}
 
-      <div className="mt-auto">
+      <div className="flex-none">
         {me && me.status === 'active' ? (
           <MyHand
             game={game}
@@ -216,7 +223,7 @@ function RoomCodeChip({ code }: { code: string }) {
       onClick={copy}
       title="Copy invite link"
     >
-      <span className="text-slate-400">Room</span>
+      <span className="hidden text-slate-400 sm:inline">Room</span>
       <span className="font-mono font-bold tracking-widest text-slate-100">{code}</span>
       <svg viewBox="0 0 20 20" className="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
         <rect x="7" y="7" width="9" height="9" rx="2" />
@@ -278,10 +285,36 @@ function PokerTable({
   const room = useGame((s) => s.room);
   const connected = new Map(room?.players.map((p) => [p.id, p.connected]) ?? []);
   const wide = useWide();
-  // Matches the table's aspect ratio (2:1 wide, 3:4 on phones).
-  // Busy phone tables use compact seats and more of the rail (further down the sides).
-  const compact = !wide && opponents.length > 5;
-  const angles = seatAngles(opponents.length, wide ? 2 : 0.75, compact ? 58 : 35);
+
+  // Measure the space the table gets and fit the oval into it.
+  const box = useRef<HTMLDivElement>(null);
+  const [space, setSpace] = useState<{ w: number; h: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      if (entry) setSpace({ w: entry.contentRect.width, h: entry.contentRect.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  let ovalW = 0;
+  let ovalH = 0;
+  if (space) {
+    if (wide) {
+      // A wide oval, between 1.6:1 and 2.2:1.
+      ovalW = Math.min(space.w, space.h * 2.2);
+      ovalH = Math.min(space.h, ovalW / 1.6);
+    } else {
+      // Full width on phones, as tall as fits (up to about 3:5).
+      ovalW = space.w;
+      ovalH = Math.min(space.h, space.w / 0.62);
+    }
+  }
+
+  // Short tables, and busy phone tables, use compact seats (and on phones more of the rail).
+  const compact = ovalH > 0 && (ovalH < 300 || (!wide && opponents.length > 5));
+  const angles = seatAngles(opponents.length, ovalH ? ovalW / ovalH : 2, compact && !wide ? 58 : 35);
   const fanSize = opponents.length > 6 ? 3 : 5;
   const onRail = (i: number, rx: number, ry: number) => ({
     left: `${50 + rx * Math.cos(angles[i] ?? 0)}%`,
@@ -289,70 +322,77 @@ function PokerTable({
   });
 
   return (
-    // Side padding leaves room for seats that hang over the rail.
-    <div className="px-10 pt-14 pb-10 sm:px-16 sm:pt-8">
-      <div className="relative mx-auto aspect-[3/4] w-full max-w-3xl sm:aspect-[2/1]">
-        {/* Rail */}
-        <div className="absolute inset-0 rounded-[50%] bg-gradient-to-b from-zinc-600 via-zinc-800 to-zinc-950 shadow-[0_24px_60px_rgba(0,0,0,0.65)] ring-1 ring-white/10" />
-        {/* Felt */}
-        <div className="absolute inset-[12px] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#24a055_0%,#177a40_55%,#0d4f29_100%)] shadow-[inset_0_0_60px_rgba(0,0,0,0.55)] sm:inset-[18px]" />
-        {/* Inner line */}
-        <div className="absolute inset-[11%] rounded-[50%] border-2 border-white/10" />
+    // Padding leaves room for seats that hang over the rail.
+    <div className="min-h-0 flex-1 px-10 pt-10 pb-5 sm:px-16 sm:pt-12 sm:pb-6">
+      <div ref={box} className="relative h-full w-full">
+        {space && ovalH > 0 && (
+          <div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+            style={{ width: ovalW, height: ovalH }}
+          >
+            {/* Rail */}
+            <div className="absolute inset-0 rounded-[50%] bg-gradient-to-b from-zinc-600 via-zinc-800 to-zinc-950 shadow-[0_24px_60px_rgba(0,0,0,0.65)] ring-1 ring-white/10" />
+            {/* Felt */}
+            <div className="absolute inset-[12px] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#24a055_0%,#177a40_55%,#0d4f29_100%)] shadow-[inset_0_0_60px_rgba(0,0,0,0.55)] sm:inset-[18px]" />
+            {/* Inner line */}
+            <div className="absolute inset-[11%] rounded-[50%] border-2 border-white/10" />
 
-        {/* Face-down fans in front of each opponent (hidden on phones to keep the centre clear) */}
-        {opponents.map((p, i) =>
-          p.status === 'active' && p.cardCount > 0 ? (
-            <div
-              key={`fan-${p.id}`}
-              className="absolute hidden -translate-x-1/2 -translate-y-1/2 sm:flex"
-              style={onRail(i, 36, 33)}
-              aria-hidden="true"
-            >
-              {Array.from({ length: Math.min(p.cardCount, fanSize) }, (_, j) => (
+            {/* Face-down fans in front of each opponent (hidden on phones and small tables to keep the centre clear) */}
+            {opponents.map((p, i) =>
+              !compact && p.status === 'active' && p.cardCount > 0 ? (
                 <div
-                  key={j}
-                  className="-ml-3 first:ml-0"
-                  style={{ transform: `rotate(${(j - (Math.min(p.cardCount, fanSize) - 1) / 2) * 12}deg)` }}
+                  key={`fan-${p.id}`}
+                  className="absolute hidden -translate-x-1/2 -translate-y-1/2 sm:flex"
+                  style={onRail(i, 36, 33)}
+                  aria-hidden="true"
                 >
-                  <CardBack size="xs" />
+                  {Array.from({ length: Math.min(p.cardCount, fanSize) }, (_, j) => (
+                    <div
+                      key={j}
+                      className="-ml-3 first:ml-0"
+                      style={{ transform: `rotate(${(j - (Math.min(p.cardCount, fanSize) - 1) / 2) * 12}deg)` }}
+                    >
+                      <CardBack size="xs" />
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : null,
+            )}
+
+            {/* Centre piles */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <TableCenter game={game} canDraw={canDraw} onDraw={onDraw} deadline={deadline} />
             </div>
-          ) : null,
-        )}
 
-        {/* Centre piles */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <TableCenter game={game} canDraw={canDraw} onDraw={onDraw} deadline={deadline} />
-        </div>
+            {/* Opponent seats on the rail */}
+            {opponents.map((p, i) => (
+              <div key={p.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={onRail(i, wide ? 50 : 53, 49)}>
+                <Seat
+                  player={p}
+                  isTurn={p.id === game.currentPlayerId && p.status === 'active'}
+                  online={connected.get(p.id) ?? false}
+                  catchable={canCatch && p.status === 'active' && p.cardCount === 1 && !p.calledUno}
+                  onCatch={() => onCatch(p.id)}
+                  compact={compact}
+                />
+              </div>
+            ))}
 
-        {/* Opponent seats on the rail */}
-        {opponents.map((p, i) => (
-          <div key={p.id} className="absolute -translate-x-1/2 -translate-y-1/2" style={onRail(i, wide ? 50 : 53, 49)}>
-            <Seat
-              player={p}
-              isTurn={p.id === game.currentPlayerId && p.status === 'active'}
-              online={connected.get(p.id) ?? false}
-              catchable={canCatch && p.status === 'active' && p.cardCount === 1 && !p.calledUno}
-              onCatch={() => onCatch(p.id)}
-              compact={compact}
-            />
-          </div>
-        ))}
-
-        {/* You, at the bottom of the rail */}
-        {me && (
-          <div className="absolute top-full left-1/2 -translate-x-1/2 -translate-y-1/2">
-            <div className="flex items-center gap-2 rounded-full bg-zinc-900/95 py-1 pr-3 pl-1 whitespace-nowrap shadow-lg ring-1 ring-white/15">
-              <Avatar
-                name={me.name}
-                size="sm"
-                active={me.id === game.currentPlayerId && me.status === 'active'}
-                dimmed={me.status === 'eliminated'}
-              />
-              <span className="text-sm font-bold">You</span>
-              <span className="text-xs text-slate-400">{me.cardCount} cards</span>
-            </div>
+            {/* You, at the bottom of the rail */}
+            {me && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 -translate-y-1/2">
+                <div className="flex items-center gap-2 rounded-full bg-zinc-900/95 py-1 pr-3 pl-1 whitespace-nowrap shadow-lg ring-1 ring-white/15">
+                  <Avatar
+                    name={me.name}
+                    size="sm"
+                    active={me.id === game.currentPlayerId && me.status === 'active'}
+                    dimmed={me.status === 'eliminated'}
+                  />
+                  <span className="text-sm font-bold">You</span>
+                  <span className="text-xs text-slate-400">{me.cardCount} cards</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -618,10 +658,10 @@ function StatusLine({
           : `Waiting for ${who}…`;
   }
   return (
-    <div className="flex min-h-11 justify-center">
+    <div className="flex min-h-8 flex-none justify-center sm:min-h-11">
       {text && (
         <p
-          className={`rounded-full px-5 py-2 text-center text-base font-bold ring-1 sm:text-lg ${
+          className={`rounded-full px-4 py-1.5 text-center text-sm font-bold ring-1 sm:px-5 sm:py-2 sm:text-lg ${
             myTurn ? 'bg-amber-400/15 text-amber-300 ring-amber-400/50' : 'bg-white/10 text-slate-100 ring-white/15'
           }`}
         >
@@ -649,6 +689,8 @@ function MyHand({
   onDraw: () => void;
   onUno: () => void;
 }) {
+  const wide = useWide();
+  const fanned = !wide && game.hand.length > 7;
   const phase = game.phase;
   const stacked = myTurn && phase.kind === 'respondToStack';
   const drawn = phase.kind === 'drawingUntilPlayable' ? phase.drawnCardId : undefined;
@@ -663,8 +705,8 @@ function MyHand({
   });
 
   return (
-    <div className="rounded-3xl bg-white/5 p-3">
-      <div className="mb-2 flex items-center gap-2 text-sm">
+    <div className="rounded-3xl bg-white/5 p-2 sm:p-3">
+      <div className="mb-1 flex items-center gap-2 text-sm sm:mb-2">
         <Avatar name={me.name} size="sm" active={myTurn} />
         <span className="font-semibold">You · {game.hand.length} cards</span>
         <div className="flex-1">
@@ -683,23 +725,24 @@ function MyHand({
         <ChatButton />
       </div>
 
-      <div data-anchor="hand" className="pt-3 pb-1">
-        {/* Wrap onto more rows instead of scrolling; row gap leaves room for raised cards. */}
-        <div className="flex flex-wrap justify-center gap-x-1.5 gap-y-3">
+      <div data-anchor="hand" className="max-h-[30dvh] overflow-y-auto pt-3 pb-1 sm:max-h-[34dvh]">
+        {/* Wrap onto more rows instead of scrolling; row gap leaves room for raised cards.
+            Big hands on phones overlap like a fan so more fit per row. */}
+        <div className={`flex flex-wrap justify-center gap-y-3 ${fanned ? 'pl-4' : 'gap-x-1.5'}`}>
           {game.hand.map((c) => {
             const dealIndex = fresh.indexOf(c.id);
             return (
               <span
                 key={c.id}
                 data-card-id={c.id}
-                className={dealIndex >= 0 ? 'animate-deal' : ''}
+                className={`${dealIndex >= 0 ? 'animate-deal' : ''} ${fanned ? '-ml-4' : ''}`}
                 style={dealIndex >= 0 ? { animationDelay: `${200 + Math.min(dealIndex, 8) * 70}ms` } : undefined}
               >
                 <Card
                   card={c}
                   playable={myTurn ? legal.has(c.id) : undefined}
                   onClick={myTurn && legal.has(c.id) ? () => onPlay(c.id) : undefined}
-                  size={game.hand.length > 15 ? 'sm' : 'md'}
+                  size={game.hand.length > 15 || (!wide && game.hand.length > 6) ? 'sm' : 'md'}
                 />
               </span>
             );
@@ -708,7 +751,7 @@ function MyHand({
       </div>
 
       {myTurn && (phase.kind === 'awaitingPlay' || stacked) && (
-        <button className={`mt-3 w-full ${stacked ? 'btn-danger' : 'btn-secondary'}`} onClick={onDraw}>
+        <button className={`mt-2 w-full py-2 sm:mt-3 sm:py-3 ${stacked ? 'btn-danger' : 'btn-secondary'}`} onClick={onDraw}>
           {stacked ? `Take +${phase.kind === 'respondToStack' ? phase.pending : 0}` : 'Draw'}
         </button>
       )}
