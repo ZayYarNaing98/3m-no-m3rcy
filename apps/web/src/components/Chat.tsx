@@ -57,6 +57,22 @@ function useKeyboardSafeBox(active: boolean): { top: number; height: number } | 
   return box;
 }
 
+/** Emoji offered by the chat's emoji button. Players can still type any emoji from their keyboard. */
+const CHAT_EMOJI = [
+  '😀', '😂', '🤣', '😊', '😍', '😎', '🤔', '😏',
+  '😴', '😱', '😭', '😡', '🤬', '😈', '💀', '🤡',
+  '🔥', '💯', '👏', '🙏', '👍', '👎', '🎉', '🃏',
+];
+
+const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|\u200d|\ufe0f|\s)+$/u;
+
+/** True for a message of just 1–3 emoji, shown large without a bubble. */
+function isBigEmoji(text: string): boolean {
+  if (!EMOJI_ONLY.test(text) || /^[\d#*\s]+$/.test(text)) return false;
+  const graphemes = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text.replace(/\s/g, ''))];
+  return graphemes.length <= 3;
+}
+
 function time(at: number): string {
   return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
@@ -65,6 +81,7 @@ function time(at: number): string {
 export function ChatPanel() {
   const { chat, chatOpen, setChatOpen, sendChat, playerId } = useGame();
   const [text, setText] = useState('');
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -85,6 +102,21 @@ export function ChatPanel() {
   }, [chatOpen, setChatOpen]);
 
   if (!chatOpen) return null;
+
+  /** Inserts an emoji at the cursor (or the end), keeping within the length limit. */
+  function insertEmoji(emoji: string) {
+    const el = input.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? text.length;
+    const next = text.slice(0, start) + emoji + text.slice(end);
+    if (next.length > CHAT_MAX_LENGTH) return;
+    setText(next);
+    // If the box is being typed in, put the cursor after the emoji once React has updated it.
+    // (Don't focus it otherwise: on phones that would pop the keyboard up.)
+    if (el && document.activeElement === el) {
+      requestAnimationFrame(() => el.setSelectionRange(start + emoji.length, start + emoji.length));
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -126,20 +158,55 @@ export function ChatPanel() {
                 <div className="text-xs text-slate-400">
                   {mine ? 'You' : m.name} · {time(m.at)}
                 </div>
-                <p
-                  className={`mt-0.5 inline-block rounded-2xl px-3 py-1.5 text-left text-sm break-words whitespace-pre-wrap ${
-                    mine ? 'rounded-tr-sm bg-sky-600 text-white' : 'rounded-tl-sm bg-white/10 text-slate-100'
-                  }`}
-                >
-                  {m.text}
-                </p>
+                {isBigEmoji(m.text) ? (
+                  <p className="mt-0.5 text-4xl leading-tight">{m.text}</p>
+                ) : (
+                  <p
+                    className={`mt-0.5 inline-block rounded-2xl px-3 py-1.5 text-left text-sm break-words whitespace-pre-wrap ${
+                      mine ? 'rounded-tr-sm bg-sky-600 text-white' : 'rounded-tl-sm bg-white/10 text-slate-100'
+                    }`}
+                  >
+                    {m.text}
+                  </p>
+                )}
               </div>
             </div>
           );
         })}
       </div>
 
+      {emojiOpen && playerId && (
+        <div role="group" aria-label="Insert emoji" className="grid grid-cols-8 gap-1 border-t border-white/10 px-3 pt-2">
+          {CHAT_EMOJI.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              className="flex h-9 items-center justify-center rounded-lg text-2xl leading-none transition hover:bg-white/10 active:scale-90"
+              // Keep the text box focused (and the phone keyboard open) while tapping emoji.
+              onPointerDown={(e) => e.preventDefault()}
+              onClick={() => insertEmoji(emoji)}
+              aria-label={`Insert ${emoji}`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
+
       <form onSubmit={submit} className="flex items-center gap-2 border-t border-white/10 p-3">
+        <button
+          type="button"
+          className={`flex h-10 w-10 flex-none items-center justify-center rounded-full text-xl transition ${
+            emojiOpen ? 'bg-white/25 ring-1 ring-white/40' : 'bg-white/10 hover:bg-white/20'
+          }`}
+          onPointerDown={(e) => e.preventDefault()}
+          onClick={() => setEmojiOpen((o) => !o)}
+          aria-expanded={emojiOpen}
+          aria-label={emojiOpen ? 'Hide emoji' : 'Show emoji'}
+          disabled={!playerId}
+        >
+          😊
+        </button>
         <input
           ref={input}
           className="input min-w-0 flex-1 py-2 text-base sm:text-sm"
