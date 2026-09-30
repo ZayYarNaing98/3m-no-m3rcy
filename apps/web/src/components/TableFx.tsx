@@ -1,6 +1,6 @@
 import type { Card as CardT } from '@nomercy/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { playCardDraw, playCardPlay, playUnoCall, playUnoCaught } from '../sound';
+import { playCardDraw, playCardPlay, playRoundWon, playUnoCall, playUnoCaught } from '../sound';
 import { useGame } from '../store';
 import { Card, CardBack } from './Card';
 
@@ -169,6 +169,7 @@ export function TableFx() {
           float(seatOf(e.playerId), 'OUT!', 'bad', t + 300);
           break;
         case 'won':
+          playRoundWon(t + 200);
           float(seatOf(e.playerId), 'Winner!', 'good', t + 200);
           break;
       }

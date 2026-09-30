@@ -181,3 +181,29 @@ export function playUnoCaught(delayMs = 0): void {
   note(311, 294, t, 0.22); // E♭4, sagging
   note(233, 196, t + 0.24, 0.42); // B♭3 sliding down to G3
 }
+
+/** Someone won the round: a quick rising run into a ringing major chord. */
+export function playRoundWon(delayMs = 0): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+
+  const t = c.currentTime + delayMs / 1000;
+  const tone = (freq: number, start: number, length: number, peak: number) => {
+    const osc = c.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, start);
+    const gain = c.createGain();
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(peak, start + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + length);
+    osc.connect(gain).connect(c.destination);
+    osc.start(start);
+    osc.stop(start + length + 0.02);
+  };
+  // Run: C5 E5 G5 C6.
+  [523, 659, 784, 1047].forEach((f, i) => tone(f, t + i * 0.1, 0.18, 0.22));
+  // Final chord (C6 E6 G6), held and ringing out.
+  const chordAt = t + 0.42;
+  [1047, 1319, 1568].forEach((f) => tone(f, chordAt, 1.1, 0.12));
+}
