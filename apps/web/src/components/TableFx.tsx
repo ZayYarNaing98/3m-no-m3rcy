@@ -6,6 +6,7 @@ import {
   playEliminated,
   playReaction,
   playRoundWon,
+  playSkip,
   playStackGrew,
   playUnoCall,
   playUnoCaught,
@@ -162,6 +163,8 @@ export function TableFx() {
           break;
         }
         case 'skipped':
+          // Just after the card that caused it lands; Skip Everyone skips more than one player.
+          playSkip(e.playerIds.length > 1, t + FLIGHT_MS * 0.85 + 60);
           for (const id of e.playerIds) float(seatOf(id), 'Skipped', 'info');
           break;
         case 'handsSwapped':

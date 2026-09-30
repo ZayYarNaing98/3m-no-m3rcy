@@ -350,3 +350,18 @@ export function playStackGrew(total: number, delayMs = 0): void {
   blip(c, { type: 'sawtooth', from: 90, to: top, start: t, length: 0.32, peak: 0.14 + intensity * 0.08, lowpass: 1400 });
   blip(c, { type: 'sawtooth', from: 92, to: top * 1.01, start: t, length: 0.32, peak: 0.04 + intensity * 0.1, lowpass: 1400 });
 }
+
+/** A turn got skipped: a quick swoosh past with a falling blip. Skip Everyone swooshes twice. */
+export function playSkip(everyone: boolean, delayMs = 0): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+
+  const t = c.currentTime + delayMs / 1000;
+  const swoosh = (start: number) => {
+    noiseBurst(c, { start, length: 0.18, peak: 0.28, type: 'bandpass', from: 3200, to: 700 });
+    blip(c, { type: 'square', from: 880, to: 330, start: start + 0.03, length: 0.14, peak: 0.07, lowpass: 2200 });
+  };
+  swoosh(t);
+  if (everyone) swoosh(t + 0.2);
+}
