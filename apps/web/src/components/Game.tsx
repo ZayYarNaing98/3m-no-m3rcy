@@ -11,6 +11,10 @@ import { TableFx } from './TableFx';
 export function Game() {
   const { game, room, playerId, stateVersion, deadline, log, send } = useGame();
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // The table version the player already answered a picker for. Pickers hide as soon as a choice
+  // is tapped, instead of waiting for the next table state (which may be held while an
+  // elimination plays out).
+  const [answeredVersion, setAnsweredVersion] = useState<number | null>(null);
   if (!game || !room) return null;
 
   const me = game.players.find((p) => p.id === playerId);
@@ -23,6 +27,14 @@ export function Game() {
 
   const play = (cardId: string) => send('game:play', { cardId, stateVersion });
   const draw = () => send('game:draw', { stateVersion });
+  const showPicker = myTurn && answeredVersion !== stateVersion;
+  // Close the picker straight away; bring it back if the server rejects the choice.
+  const answer = (type: string, payload: object) => {
+    setAnsweredVersion(stateVersion);
+    void send(type, payload).then((ack) => {
+      if (!ack.ok) setAnsweredVersion(null);
+    });
+  };
 
   // Seat order starting after me, so opponents read clockwise.
   const myIndex = game.players.findIndex((p) => p.id === playerId);
@@ -126,20 +138,20 @@ export function Game() {
         )}
       </div>
 
-      {myTurn && phase.kind === 'chooseColor' && (
-        <ColorSheet title="Choose a colour" onPick={(color) => send('game:chooseColor', { color })} />
+      {showPicker && phase.kind === 'chooseColor' && (
+        <ColorSheet title="Choose a colour" onPick={(color) => answer('game:chooseColor', { color })} />
       )}
-      {myTurn && phase.kind === 'rouletteNameColor' && (
+      {showPicker && phase.kind === 'rouletteNameColor' && (
         <ColorSheet
           title="Colour Roulette! Name a colour"
           subtitle="You flip cards until that colour shows up and keep them all. Your colour then becomes the colour in play."
-          onPick={(color) => send('game:rouletteColor', { color })}
+          onPick={(color) => answer('game:rouletteColor', { color })}
         />
       )}
-      {myTurn && phase.kind === 'chooseSwapTarget' && (
+      {showPicker && phase.kind === 'chooseSwapTarget' && (
         <SwapSheet
           players={game.players.filter((p) => p.status === 'active' && p.id !== playerId)}
-          onPick={(id) => send('game:chooseSwap', { targetId: id })}
+          onPick={(id) => answer('game:chooseSwap', { targetId: id })}
         />
       )}
       {finished && <Results game={game} isHost={room.hostId === playerId} />}
