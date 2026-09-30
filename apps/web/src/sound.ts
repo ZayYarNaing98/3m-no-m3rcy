@@ -395,3 +395,18 @@ export function playReverse(delayMs = 0): void {
   osc.stop(t + 0.42);
   lfo.stop(t + 0.42);
 }
+
+/** A wild card was played: a quick sparkly run of rising high notes, like a magic wand. */
+export function playWild(delayMs = 0): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+
+  const t = c.currentTime + delayMs / 1000;
+  // Rising run through a bright scale, with each note ringing briefly.
+  [880, 1109, 1319, 1661, 1976, 2637].forEach((f, i) =>
+    blip(c, { type: 'sine', from: f, start: t + i * 0.045, length: 0.22, peak: 0.1 }),
+  );
+  // A soft airy shimmer under it.
+  noiseBurst(c, { start: t, length: 0.22, peak: 0.08, type: 'highpass', from: 5000 });
+}

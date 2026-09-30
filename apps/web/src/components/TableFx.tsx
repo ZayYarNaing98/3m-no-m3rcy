@@ -11,6 +11,7 @@ import {
   playStackGrew,
   playUnoCall,
   playUnoCaught,
+  playWild,
 } from '../sound';
 import {
   DRAW_GAP_MS,
@@ -129,8 +130,9 @@ export function TableFx() {
           const from = (e.playerId === playerId ? cardRect(e.card.id) : null) ?? seatOf(e.playerId);
           const to = anchorRect('discard');
           if (from && to) newFlights.push({ id: nextId++, from, to, card: e.card, delay: t });
-          // Slap as the flying card lands on the pile.
+          // Slap as the flying card lands on the pile, with a magic shimmer for wilds.
           playCardPlay(t + FLIGHT_MS * 0.85);
+          if (e.card.color === null) playWild(t + FLIGHT_MS * 0.85 + 30);
           break;
         }
         case 'stackGrew':
