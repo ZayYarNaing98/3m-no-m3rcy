@@ -317,3 +317,17 @@ export function playReaction(emoji: string): void {
       break;
   }
 }
+
+/** Someone hit 25 cards and is out: a heavy crash into a long, low sinking tone. */
+export function playEliminated(delayMs = 0): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+
+  const t = c.currentTime + delayMs / 1000;
+  // Crash: a loud, dark noise hit.
+  noiseBurst(c, { start: t, length: 0.24, peak: 0.45, type: 'lowpass', from: 1800, to: 300 });
+  // Doom: a low tone sinking over most of a second, with a detuned twin for weight.
+  blip(c, { type: 'sawtooth', from: 160, to: 45, start: t + 0.05, length: 0.9, peak: 0.2, lowpass: 600 });
+  blip(c, { type: 'sawtooth', from: 164, to: 46, start: t + 0.05, length: 0.9, peak: 0.12, lowpass: 600 });
+}
