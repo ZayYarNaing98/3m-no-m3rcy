@@ -9,6 +9,9 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   REACTION_COOLDOWN_MS,
+  CHAT_COOLDOWN_MS,
+  CHAT_HISTORY,
+  type ChatMessage,
   playerView,
   type Action,
   type ClientMessage,
@@ -47,6 +50,8 @@ interface RoomRecord {
   stateVersion: number;
   deadline: number | null;
   emptySince: number | null;
+  /** Recent chat, oldest first. Optional so rooms saved before chat existed still load. */
+  chat?: ChatMessage[];
 }
 
 interface SocketAttachment {
@@ -67,6 +72,7 @@ export class Room extends DurableObject<Env> {
   private rate = new WeakMap<WebSocket, { windowStart: number; count: number }>();
   /** Last reaction time per player; in memory only, so it resets on hibernation. */
   private lastReaction = new Map<string, number>();
+  private lastChat = new Map<string, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -234,6 +240,28 @@ export class Room extends DurableObject<Env> {
         const reaction: ServerMessage = { type: 'reaction', playerId: seat.id, emoji: msg.payload.emoji };
         for (const ws of this.ctx.getWebSockets()) this.send(ws, reaction);
         // Reactions are fire-and-forget: nothing to save or re-broadcast.
+        return;
+      }
+
+      case 'room:chat': {
+        const seat = this.requireSeat(me);
+        const now = Date.now();
+        if (now - (this.lastChat.get(seat.id) ?? 0) < CHAT_COOLDOWN_MS) {
+          throw new RoomError('slow_down', 'You are sending messages too fast');
+        }
+        this.lastChat.set(seat.id, now);
+        const message: ChatMessage = {
+          id: crypto.randomUUID(),
+          playerId: seat.id,
+          name: seat.name,
+          text: msg.payload.text,
+          at: now,
+        };
+        room.chat = [...(room.chat ?? []), message].slice(-CHAT_HISTORY);
+        this.save();
+        const out: ServerMessage = { type: 'chat', message };
+        // Only seated players get chat, matching who receives the history.
+        for (const ws of this.ctx.getWebSockets()) if (this.attachment(ws).playerId) this.send(ws, out);
         return;
       }
 
@@ -430,6 +458,7 @@ export class Room extends DurableObject<Env> {
     ws.serializeAttachment({ playerId: seat.id } satisfies SocketAttachment);
     room.emptySince = null;
     this.send(ws, { type: 'welcome', playerId: seat.id, playerToken: seat.token, roomCode: room.code });
+    this.send(ws, { type: 'chat:history', messages: room.chat ?? [] });
     this.sendGame(ws, seat.id);
   }
 

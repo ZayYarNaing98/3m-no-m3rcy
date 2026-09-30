@@ -5,6 +5,7 @@ import { setSoundEnabled, soundEnabled } from '../sound';
 import { useGame } from '../store';
 import { Avatar } from './Avatar';
 import { Card, CardBack, COLOR_BG, COLOR_RING } from './Card';
+import { ChatButton, ChatPanel } from './Chat';
 import { TableFx } from './TableFx';
 
 export function Game() {
@@ -92,6 +93,7 @@ export function Game() {
           <div className="flex items-center justify-center gap-3 py-6 text-slate-400">
             <p>{me?.status === 'eliminated' ? "You're out — no mercy. Watch the carnage." : 'Spectating'}</p>
             {me && <ReactionPicker />}
+            {me && <ChatButton />}
           </div>
         )}
       </div>
@@ -117,6 +119,7 @@ export function Game() {
         <LeaveSheet forfeits={me?.status === 'active'} onCancel={() => setConfirmLeave(false)} />
       )}
       <TableFx />
+      <ChatPanel />
     </div>
   );
 }
@@ -498,6 +501,7 @@ function MyHand({
           UNO!
         </button>
         <ReactionPicker />
+        <ChatButton />
       </div>
 
       <div data-anchor="hand" className="pt-3 pb-1">

@@ -1,4 +1,13 @@
-import type { ErrorInfo, GameEvent, PlayerView, Reaction, RoomView, ServerMessage } from '@nomercy/engine';
+import {
+  CHAT_HISTORY,
+  type ChatMessage,
+  type ErrorInfo,
+  type GameEvent,
+  type PlayerView,
+  type Reaction,
+  type RoomView,
+  type ServerMessage,
+} from '@nomercy/engine';
 import { create } from 'zustand';
 import { describeEvent } from './events';
 
@@ -25,6 +34,10 @@ interface State {
   fx: { seq: number; events: GameEvent[] };
   /** Latest emoji reaction from anyone at the table. */
   reaction: { seq: number; playerId: string; emoji: Reaction } | null;
+  chat: ChatMessage[];
+  chatOpen: boolean;
+  /** Messages from others that arrived while the chat panel was closed. */
+  chatUnread: number;
   toast: string | null;
   closedReason: string | null;
 
@@ -34,6 +47,8 @@ interface State {
   join(name: string): Promise<Ack>;
   leave(): Promise<void>;
   react(emoji: Reaction): Promise<Ack>;
+  sendChat(text: string): Promise<Ack>;
+  setChatOpen(open: boolean): void;
   showToast(message: string): void;
 }
 
@@ -79,6 +94,9 @@ export const useGame = create<State>((set, get) => ({
   log: [],
   fx: { seq: 0, events: [] },
   reaction: null,
+  chat: [],
+  chatOpen: false,
+  chatUnread: 0,
   toast: null,
   closedReason: null,
 
@@ -174,6 +192,14 @@ export const useGame = create<State>((set, get) => ({
     return get().send('room:react', { emoji });
   },
 
+  sendChat(text) {
+    return get().send('room:chat', { text });
+  },
+
+  setChatOpen(open) {
+    set(open ? { chatOpen: true, chatUnread: 0 } : { chatOpen: false });
+  },
+
   showToast(message) {
     clearTimeout(toastTimer);
     set({ toast: message });
@@ -182,7 +208,18 @@ export const useGame = create<State>((set, get) => ({
 }));
 
 function freshRoom() {
-  return { ready: false, playerId: null, room: null, game: null, stateVersion: 0, deadline: null, log: [] };
+  return {
+    ready: false,
+    playerId: null,
+    room: null,
+    game: null,
+    stateVersion: 0,
+    deadline: null,
+    log: [],
+    chat: [],
+    chatOpen: false,
+    chatUnread: 0,
+  };
 }
 
 function handleMessage(msg: ServerMessage) {
@@ -210,6 +247,18 @@ function handleMessage(msg: ServerMessage) {
       appendLog(msg.events);
       set({ fx: { seq: get().fx.seq + 1, events: msg.events } });
       break;
+    case 'chat:history':
+      set({ chat: msg.messages });
+      break;
+    case 'chat': {
+      const { chat, chatOpen, chatUnread, playerId } = get();
+      const mine = msg.message.playerId === playerId;
+      set({
+        chat: [...chat, msg.message].slice(-CHAT_HISTORY),
+        chatUnread: chatOpen || mine ? chatUnread : chatUnread + 1,
+      });
+      break;
+    }
     case 'reaction':
       set({ reaction: { seq: (get().reaction?.seq ?? 0) + 1, playerId: msg.playerId, emoji: msg.emoji } });
       break;

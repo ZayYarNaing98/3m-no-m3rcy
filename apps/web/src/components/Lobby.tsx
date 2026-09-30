@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { navigate } from '../App';
 import { useGame } from '../store';
 import { Avatar } from './Avatar';
+import { ChatButton, ChatPanel } from './Chat';
 
 export function Lobby() {
   const { room, playerId, send, leave } = useGame();
@@ -32,7 +33,10 @@ export function Lobby() {
       </header>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold text-slate-400">Players · {room.players.length}/10</h2>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-400">Players · {room.players.length}/10</h2>
+          <ChatButton />
+        </div>
         <ul className="divide-y divide-white/5 rounded-2xl bg-white/5">
           {room.players.map((p) => (
             <li key={p.id} className="flex items-center gap-3 px-4 py-3">
@@ -89,6 +93,7 @@ export function Lobby() {
           Leave room
         </button>
       </div>
+      <ChatPanel />
     </div>
   );
 }

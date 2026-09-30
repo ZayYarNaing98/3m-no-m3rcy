@@ -1,4 +1,4 @@
-import { COLORS, REACTIONS, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
+import { CHAT_MAX_LENGTH, COLORS, REACTIONS, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
 import { z } from 'zod';
 
 const id = z.string().min(1).max(64);
@@ -34,6 +34,17 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   msg('game:catchUno', z.object({ targetId: id })),
   msg('game:rematch', empty),
   msg('room:react', z.object({ emoji: z.enum(REACTIONS) })),
+  msg(
+    'room:chat',
+    z.object({
+      text: z
+        .string()
+        .max(CHAT_MAX_LENGTH * 4)
+        // Control characters become spaces; runs of whitespace collapse to one.
+        .transform((t) => t.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim())
+        .pipe(z.string().min(1, 'Type a message first').max(CHAT_MAX_LENGTH, `Keep it under ${CHAT_MAX_LENGTH} characters`)),
+    }),
+  ),
 ]);
 
 export function parseClientMessage(raw: string): ClientMessage | { error: string; requestId?: string } {

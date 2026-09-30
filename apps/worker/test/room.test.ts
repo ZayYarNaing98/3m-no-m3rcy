@@ -181,3 +181,48 @@ describe('reactions', () => {
     expect(bad).toMatchObject({ ok: false, error: { code: 'bad_message' } });
   });
 });
+
+describe('chat', () => {
+  it('relays cleaned messages to seated players and keeps history for rejoin', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const b = await connect(code);
+    const viewer = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    await b.request('room:join', { name: 'Ben' });
+    const welcome = await a.waitFor((m): m is Extract<ServerMessage, { type: 'welcome' }> => m.type === 'welcome');
+
+    expect((await a.request('room:chat', { text: '  gg   no\nmercy  ' })).ok).toBe(true);
+    const got = await b.waitFor((m): m is Extract<ServerMessage, { type: 'chat' }> => m.type === 'chat');
+    expect(got.message).toMatchObject({ playerId: welcome.playerId, name: 'Ana', text: 'gg no mercy' });
+    expect(viewer.msgs.some((m) => m.type === 'chat')).toBe(false);
+
+    // Reconnecting with the seat token brings the history back.
+    a.ws.close();
+    const again = await connect(code);
+    await again.request('room:rejoin', { playerToken: welcome.playerToken });
+    const history = await again.waitFor(
+      (m): m is Extract<ServerMessage, { type: 'chat:history' }> => m.type === 'chat:history',
+    );
+    expect(history.messages.map((m) => m.text)).toEqual(['gg no mercy']);
+  });
+
+  it('rejects empty, too long, unseated and spammy messages', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const outsider = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+
+    expect(await a.request('room:chat', { text: '   ' })).toMatchObject({ ok: false, error: { code: 'bad_message' } });
+    expect(await a.request('room:chat', { text: 'x'.repeat(201) })).toMatchObject({
+      ok: false,
+      error: { code: 'bad_message' },
+    });
+    expect(await outsider.request('room:chat', { text: 'hi' })).toMatchObject({
+      ok: false,
+      error: { code: 'not_seated' },
+    });
+    expect((await a.request('room:chat', { text: 'one' })).ok).toBe(true);
+    expect(await a.request('room:chat', { text: 'two' })).toMatchObject({ ok: false, error: { code: 'slow_down' } });
+  });
+});

@@ -22,7 +22,7 @@ interface Float {
   id: number;
   at: DOMRect;
   text: string;
-  tone: 'bad' | 'good' | 'info' | 'emoji';
+  tone: 'bad' | 'good' | 'info' | 'emoji' | 'chat';
   delay: number;
 }
 
@@ -55,6 +55,22 @@ export function TableFx() {
   const [floats, setFloats] = useState<Float[]>([]);
   const lastSeq = useRef(fx.seq);
   const reaction = useGame((s) => s.reaction);
+  const lastChat = useGame((s) => s.chat.at(-1));
+  const lastChatId = useRef(lastChat?.id);
+
+  // New chat messages pop up as a speech bubble over the sender.
+  useEffect(() => {
+    if (!lastChat || lastChat.id === lastChatId.current) return;
+    lastChatId.current = lastChat.id;
+    // History arriving after a refresh shouldn't replay as a bubble.
+    if (Date.now() - lastChat.at > 5000) return;
+    const at =
+      (lastChat.playerId === playerId ? anchorRect('hand') : anchorRect(`seat:${lastChat.playerId}`)) ??
+      anchorRect('reactions');
+    if (!at) return;
+    const text = lastChat.text.length > 60 ? `${lastChat.text.slice(0, 57)}…` : lastChat.text;
+    setFloats((f) => [...f, { id: nextId++, at, text, tone: 'chat', delay: 0 }]);
+  }, [lastChat, playerId]);
   const lastReaction = useRef(reaction?.seq ?? 0);
 
   // Emoji reactions float up over the sender (or the emoji bar for your own if you have no hand).
@@ -210,14 +226,15 @@ const TONES: Record<Float['tone'], string> = {
   good: 'bg-yellow-400 text-slate-900',
   info: 'bg-slate-100 text-slate-900',
   emoji: 'bg-transparent text-5xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)]',
+  chat: 'max-w-56 truncate rounded-2xl rounded-bl-sm bg-white px-3 py-1.5 text-sm font-semibold text-slate-900 shadow-xl',
 };
 
 function FloatingText({ float, onDone }: { float: Float; onDone: () => void }) {
   const { at, text, tone, delay } = float;
   return (
     <span
-      className={`animate-float-up absolute rounded-full whitespace-nowrap ${
-        tone === 'emoji' ? '' : 'px-3 py-1 text-sm font-black shadow-xl'
+      className={`absolute whitespace-nowrap ${tone === 'chat' ? 'animate-bubble' : 'animate-float-up rounded-full'} ${
+        tone === 'emoji' || tone === 'chat' ? '' : 'px-3 py-1 text-sm font-black shadow-xl'
       } ${TONES[tone]}`}
       style={{ left: at.left + at.width / 2, top: at.top + Math.min(at.height, 60) / 2, animationDelay: `${delay}ms` }}
       onAnimationEnd={onDone}

@@ -18,6 +18,7 @@ export type ClientMessage = { requestId?: string } & (
   | { type: 'game:catchUno'; payload: { targetId: string } }
   | { type: 'game:rematch'; payload: Record<string, never> }
   | { type: 'room:react'; payload: { emoji: Reaction } }
+  | { type: 'room:chat'; payload: { text: string } }
 );
 
 export type ClientMessageType = ClientMessage['type'];
@@ -56,6 +57,8 @@ export type ServerMessage =
   | { type: 'game:state'; game: PlayerView; stateVersion: number; deadline: number | null }
   | { type: 'game:events'; events: GameEvent[] }
   | { type: 'reaction'; playerId: string; emoji: Reaction }
+  | { type: 'chat'; message: ChatMessage }
+  | { type: 'chat:history'; messages: ChatMessage[] }
   | { type: 'error'; error: ErrorInfo };
 
 export const MIN_PLAYERS = 2;
@@ -74,3 +77,18 @@ export const REACTIONS = [
 export type Reaction = (typeof REACTIONS)[number];
 /** Minimum gap between one player's reactions. */
 export const REACTION_COOLDOWN_MS = 600;
+
+export interface ChatMessage {
+  id: string;
+  playerId: string;
+  name: string;
+  text: string;
+  /** Server time in ms. */
+  at: number;
+}
+
+export const CHAT_MAX_LENGTH = 200;
+/** Messages a room keeps so reconnecting players see the conversation. */
+export const CHAT_HISTORY = 50;
+/** Minimum gap between one player's chat messages. */
+export const CHAT_COOLDOWN_MS = 800;

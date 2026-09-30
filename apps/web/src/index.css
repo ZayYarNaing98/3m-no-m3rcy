@@ -96,3 +96,26 @@ body {
     animation: none;
   }
 }
+
+/* Chat speech bubbles: pop in, hold long enough to read, fade out. */
+@keyframes bubble {
+  0% {
+    transform: translate(-50%, 6px) scale(0.8);
+    opacity: 0;
+  }
+  6% {
+    transform: translate(-50%, -12px) scale(1);
+    opacity: 1;
+  }
+  85% {
+    transform: translate(-50%, -12px) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -24px) scale(0.95);
+    opacity: 0;
+  }
+}
+.animate-bubble {
+  animation: bubble 3600ms ease-out both;
+}
