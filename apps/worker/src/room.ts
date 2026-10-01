@@ -38,6 +38,8 @@ interface Seat {
   joinedAt: number;
   afkStrikes: number;
   left: boolean;
+  /** Optional so seats saved before the ready check still load (as not ready). */
+  ready?: boolean;
 }
 
 interface RoomRecord {
@@ -193,6 +195,7 @@ export class Room extends DurableObject<Env> {
           joinedAt: Date.now(),
           afkStrikes: 0,
           left: false,
+          ready: false,
         };
         room.seats.push(seat);
         if (!this.seat(room.hostId)) room.hostId = seat.id;
@@ -284,18 +287,31 @@ export class Room extends DurableObject<Env> {
         break;
       }
 
-      case 'game:start':
-      case 'game:rematch': {
-        this.requireHost(me);
+      case 'room:ready': {
+        const seat = this.requireSeat(me);
         if (room.status === 'playing') throw new RoomError('game_in_progress', 'A game is already running');
+        seat.ready = msg.payload.ready;
+        break;
+      }
+
+      case 'game:start': {
+        this.requireHost(me);
+        if (room.status !== 'lobby') throw new RoomError('game_in_progress', 'Return to the lobby first');
         const seated = this.seated();
         if (seated.length < MIN_PLAYERS) throw new RoomError('not_enough_players', `Need at least ${MIN_PLAYERS} players`);
+        if (seated.some((s) => s.id !== room.hostId && !s.ready)) {
+          throw new RoomError('not_ready', 'Everyone needs to be ready first');
+        }
         const seed = crypto.getRandomValues(new Uint32Array(1))[0] as number;
         room.game = createGame(
           seated.map((s) => ({ id: s.id, name: s.name })),
           seed,
         );
-        for (const s of seated) s.afkStrikes = 0;
+        for (const s of seated) {
+          s.afkStrikes = 0;
+          // Everyone readies up again before the next game.
+          s.ready = false;
+        }
         room.status = 'playing';
         room.stateVersion++;
         this.resetDeadline();
@@ -421,6 +437,7 @@ export class Room extends DurableObject<Env> {
         name: s.name,
         connected: connected.has(s.id),
         afk: s.afkStrikes >= AFK_STRIKES,
+        ready: !!s.ready,
       })),
       spectators: this.ctx.getWebSockets().filter((ws) => ws !== exclude && !this.attachment(ws).playerId).length,
     };

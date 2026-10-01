@@ -10,6 +10,10 @@ export function Lobby() {
   const [copied, setCopied] = useState(false);
   if (!room) return null;
   const isHost = room.hostId === playerId;
+  const me = room.players.find((p) => p.id === playerId);
+  const guests = room.players.filter((p) => p.id !== room.hostId);
+  const readyCount = guests.filter((p) => p.ready).length;
+  const allReady = readyCount === guests.length;
   const link = `${location.origin}/r/${room.code}`;
 
   async function copy() {
@@ -45,7 +49,13 @@ export function Lobby() {
                 {p.name}
                 {p.id === playerId && <span className="text-slate-500"> (you)</span>}
               </span>
-              {p.id === room.hostId && <span className="rounded-full bg-amber-400/20 px-2 text-xs text-amber-300">host</span>}
+              {p.id === room.hostId ? (
+                <span className="rounded-full bg-amber-400/20 px-2 text-xs text-amber-300">host</span>
+              ) : p.ready ? (
+                <span className="rounded-full bg-emerald-400/20 px-2 text-xs text-emerald-300">ready</span>
+              ) : (
+                <span className="rounded-full bg-white/10 px-2 text-xs text-slate-400">not ready</span>
+              )}
               {isHost && p.id !== playerId && (
                 <button className="text-xs text-red-400 hover:underline" onClick={() => send('room:kick', { playerId: p.id })}>
                   Kick
@@ -77,11 +87,29 @@ export function Lobby() {
 
       <div className="mt-auto flex flex-col gap-3">
         {isHost ? (
-          <button className="btn-primary" disabled={room.players.length < MIN_PLAYERS} onClick={() => send('game:start')}>
-            {room.players.length < MIN_PLAYERS ? 'Waiting for players…' : 'Start game'}
+          <button
+            className="btn-primary"
+            disabled={room.players.length < MIN_PLAYERS || !allReady}
+            onClick={() => send('game:start')}
+          >
+            {room.players.length < MIN_PLAYERS
+              ? 'Waiting for players…'
+              : allReady
+                ? 'Start game'
+                : `Waiting for everyone to be ready (${readyCount}/${guests.length})`}
           </button>
         ) : (
-          <p className="text-center text-slate-400">Waiting for the host to start…</p>
+          <>
+            <p className="text-center text-sm text-slate-400">
+              {me?.ready ? 'Waiting for the host to start…' : 'Ready up so the host can start.'}
+            </p>
+            <button
+              className={me?.ready ? 'btn-secondary' : 'btn-primary'}
+              onClick={() => send('room:ready', { ready: !me?.ready })}
+            >
+              {me?.ready ? 'Not ready' : "I'm ready"}
+            </button>
+          </>
         )}
         <button
           className="btn-secondary"

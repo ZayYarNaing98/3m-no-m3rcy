@@ -793,12 +793,12 @@ function MyHand({
 
 function ColorSheet({ title, subtitle, onPick }: { title: string; subtitle?: string; onPick: (c: Color) => void }) {
   return (
-    <Sheet title={title} subtitle={subtitle}>
-      <div className="grid grid-cols-2 gap-3">
+    <Sheet title={title} subtitle={subtitle} peek>
+      <div className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-3">
         {COLORS.map((c) => (
           <button
             key={c}
-            className={`h-20 rounded-2xl text-lg font-bold capitalize shadow-lg ring-2 ring-white/70 hover:scale-[1.03] ${COLOR_BG[c]}`}
+            className={`h-14 rounded-2xl text-base font-bold capitalize shadow-lg ring-2 ring-white/70 hover:scale-[1.03] sm:h-20 sm:text-lg ${COLOR_BG[c]}`}
             onClick={() => onPick(c)}
           >
             {c}
@@ -811,7 +811,7 @@ function ColorSheet({ title, subtitle, onPick }: { title: string; subtitle?: str
 
 function SwapSheet({ players, onPick }: { players: PublicPlayer[]; onPick: (id: string) => void }) {
   return (
-    <Sheet title="Swap hands with…" subtitle="You played a 7. Pick a player to trade your whole hand with.">
+    <Sheet title="Swap hands with…" subtitle="You played a 7. Pick a player to trade your whole hand with." peek>
       <div className="flex flex-col gap-2">
         {players.map((p) => (
           <button key={p.id} className="btn-secondary flex items-center gap-3" onClick={() => onPick(p.id)}>
@@ -825,13 +825,32 @@ function SwapSheet({ players, onPick }: { players: PublicPlayer[]; onPick: (id: 
   );
 }
 
-function Sheet({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+function Sheet({
+  title,
+  subtitle,
+  peek,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  /** Mid-turn choices: on phones, sit at the top with a light backdrop so your hand stays visible below. */
+  peek?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 p-3 sm:items-center">
-      <div role="dialog" aria-label={title} className="w-full max-w-sm rounded-3xl bg-slate-900 p-5 shadow-2xl ring-1 ring-white/10">
-        <h2 className="text-lg font-bold">{title}</h2>
-        {subtitle && <p className="mt-1 text-sm text-slate-400">{subtitle}</p>}
-        <div className="mt-4">{children}</div>
+    <div
+      className={`fixed inset-0 z-40 flex justify-center p-3 sm:items-center sm:bg-black/60 ${
+        peek ? 'items-start bg-black/25 pt-[max(env(safe-area-inset-top),0.75rem)]' : 'items-end bg-black/60'
+      }`}
+    >
+      <div
+        role="dialog"
+        aria-label={title}
+        className={`w-full max-w-sm rounded-3xl bg-slate-900 shadow-2xl ring-1 ring-white/10 ${peek ? 'p-4 sm:p-5' : 'p-5'}`}
+      >
+        <h2 className={`font-bold ${peek ? 'text-base sm:text-lg' : 'text-lg'}`}>{title}</h2>
+        {subtitle && <p className={`mt-1 text-slate-400 ${peek ? 'text-xs sm:text-sm' : 'text-sm'}`}>{subtitle}</p>}
+        <div className={peek ? 'mt-3 sm:mt-4' : 'mt-4'}>{children}</div>
       </div>
     </div>
   );
@@ -865,14 +884,9 @@ function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
         ))}
       </ol>
       <div className="mt-5 flex flex-col gap-2">
-        {isHost && (
-          <button className="btn-primary" onClick={() => send('game:rematch')}>
-            Rematch
-          </button>
-        )}
         {seated && (
           <button
-            className={isHost ? 'btn-secondary' : 'btn-primary'}
+            className="btn-primary"
             // The host takes the whole room back, reopening it to new players; others just go wait there.
             onClick={() => (isHost ? send('room:lobby') : useGame.getState().setLobbyView(true))}
           >

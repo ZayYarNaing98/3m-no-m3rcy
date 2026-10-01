@@ -71,6 +71,10 @@ describe('room over WebSocket', () => {
     const bStart = await b.request('game:start');
     expect(bStart.ok).toBe(false);
 
+    expect(await a.request('game:start')).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+    expect((await b.request('room:ready', { ready: true })).ok).toBe(true);
+    expect(a.latest('room:state')!.room.players.find((p) => p.name === 'Ben')!.ready).toBe(true);
+
     expect((await a.request('game:start')).ok).toBe(true);
     const gameA = await a.waitFor((m): m is Extract<ServerMessage, { type: 'game:state' }> => m.type === 'game:state');
     await b.waitFor((m) => m.type === 'game:state');
@@ -88,6 +92,7 @@ describe('room over WebSocket', () => {
     const b = await connect(code);
     await a.request('room:join', { name: 'Ana' });
     await b.request('room:join', { name: 'Ben' });
+    await b.request('room:ready', { ready: true });
     await a.request('game:start');
     const state = await a.waitFor((m): m is Extract<ServerMessage, { type: 'game:state' }> => m.type === 'game:state');
 
@@ -127,6 +132,7 @@ describe('room over WebSocket', () => {
     const b = await connect(code);
     await a.request('room:join', { name: 'Ana' });
     await b.request('room:join', { name: 'Ben' });
+    await b.request('room:ready', { ready: true });
     await a.request('game:start');
     expect(await a.request('room:lobby')).toMatchObject({ ok: false, error: { code: 'game_in_progress' } });
 
@@ -142,7 +148,11 @@ describe('room over WebSocket', () => {
 
     const c = await connect(code);
     expect((await c.request('room:join', { name: 'Cy' })).ok).toBe(true);
+    expect(await a.request('game:start')).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+    await c.request('room:ready', { ready: true });
     expect((await a.request('game:start')).ok).toBe(true);
+    // Ready flags reset once the game is under way.
+    expect(a.latest('room:state')!.room.players.every((p) => !p.ready)).toBe(true);
   });
 
   it('rejects invalid messages', async () => {
@@ -160,6 +170,7 @@ describe('room persistence and timers', () => {
     const b = await connect(code);
     await a.request('room:join', { name: 'Ana' });
     await b.request('room:join', { name: 'Ben' });
+    await b.request('room:ready', { ready: true });
     await a.request('game:start');
     await a.waitFor((m) => m.type === 'game:state');
 
@@ -258,6 +269,7 @@ describe('spectators', () => {
     const b = await connect(code);
     await a.request('room:join', { name: 'Ana' });
     await b.request('room:join', { name: 'Ben' });
+    await b.request('room:ready', { ready: true });
     await a.request('game:start');
 
     const watcher = await connect(code);

@@ -32,8 +32,8 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   msg('game:rouletteColor', z.object({ color })),
   msg('game:callUno', empty),
   msg('game:catchUno', z.object({ targetId: id })),
-  msg('game:rematch', empty),
   msg('room:lobby', empty),
+  msg('room:ready', z.object({ ready: z.boolean() })),
   msg('room:react', z.object({ emoji: z.enum(REACTIONS) })),
   msg(
     'room:chat',

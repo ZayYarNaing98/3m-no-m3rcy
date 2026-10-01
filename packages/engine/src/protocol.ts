@@ -16,8 +16,8 @@ export type ClientMessage = { requestId?: string } & (
   | { type: 'game:rouletteColor'; payload: { color: Color } }
   | { type: 'game:callUno'; payload: Record<string, never> }
   | { type: 'game:catchUno'; payload: { targetId: string } }
-  | { type: 'game:rematch'; payload: Record<string, never> }
   | { type: 'room:lobby'; payload: Record<string, never> }
+  | { type: 'room:ready'; payload: { ready: boolean } }
   | { type: 'room:react'; payload: { emoji: Reaction } }
   | { type: 'room:chat'; payload: { text: string } }
 );
@@ -40,6 +40,8 @@ export interface RoomPlayerView {
   name: string;
   connected: boolean;
   afk: boolean;
+  /** Ready for the next game. The host starts it, so their own flag is ignored. */
+  ready: boolean;
 }
 
 export interface RoomView {
