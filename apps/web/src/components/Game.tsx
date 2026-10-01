@@ -7,6 +7,7 @@ import { Avatar } from './Avatar';
 import { Card, CardBack, COLOR_BG, COLOR_RING } from './Card';
 import { ChatButton, ChatPanel } from './Chat';
 import { TableFx } from './TableFx';
+import { seatRectOf, ThrowMenu, type ThrowTarget } from './ThrowMenu';
 
 export function Game() {
   const { game, room, playerId, stateVersion, deadline, log, send } = useGame();
@@ -15,6 +16,7 @@ export function Game() {
   // is tapped, instead of waiting for the next table state (which may be held while an
   // elimination plays out).
   const [answeredVersion, setAnsweredVersion] = useState<number | null>(null);
+  const [throwTarget, setThrowTarget] = useState<ThrowTarget | null>(null);
   if (!game || !room) return null;
 
   const me = game.players.find((p) => p.id === playerId);
@@ -28,6 +30,11 @@ export function Game() {
   const play = (cardId: string) => send('game:play', { cardId, stateVersion });
   const draw = () => send('game:draw', { stateVersion });
   const showPicker = myTurn && answeredVersion !== stateVersion;
+  const canCatchSeat = (p: PublicPlayer) => me?.status === 'active' && p.status === 'active' && p.cardCount === 1 && !p.calledUno;
+  // Seated players can throw things at anyone else still in the room; spectators can't.
+  const inRoom = new Set(room.players.map((p) => p.id));
+  const onSeatTap = me ? (target: ThrowTarget) => inRoom.has(target.id) && setThrowTarget(target) : undefined;
+  const throwTargetPlayer = throwTarget && game.players.find((p) => p.id === throwTarget.id);
   // Close the picker straight away; bring it back if the server rejects the choice.
   const answer = (type: string, payload: object) => {
     setAnsweredVersion(stateVersion);
@@ -89,6 +96,7 @@ export function Game() {
         canDraw={canDraw}
         onDraw={draw}
         deadline={finished ? null : deadline}
+        onSeatTap={onSeatTap}
       />
 
       <StatusLine game={game} myTurn={myTurn} current={current} isMe={(id) => id === playerId} />
@@ -152,6 +160,17 @@ export function Game() {
         <SwapSheet
           players={game.players.filter((p) => p.status === 'active' && p.id !== playerId)}
           onPick={(id) => answer('game:chooseSwap', { targetId: id })}
+        />
+      )}
+      {throwTarget && !finished && (
+        <ThrowMenu
+          target={throwTarget}
+          onCatch={
+            throwTargetPlayer && canCatchSeat(throwTargetPlayer)
+              ? () => send('game:catchUno', { targetId: throwTarget.id })
+              : undefined
+          }
+          onClose={() => setThrowTarget(null)}
         />
       )}
       {finished && <Results game={game} isHost={room.hostId === playerId} />}
@@ -303,6 +322,7 @@ function PokerTable({
   canDraw,
   onDraw,
   deadline,
+  onSeatTap,
 }: {
   game: PlayerView;
   opponents: PublicPlayer[];
@@ -312,6 +332,8 @@ function PokerTable({
   canDraw: boolean;
   onDraw: () => void;
   deadline: number | null;
+  /** Tapping an opponent's avatar opens the throw menu. */
+  onSeatTap?: (target: ThrowTarget) => void;
 }) {
   const room = useGame((s) => s.room);
   const connected = new Map(room?.players.map((p) => [p.id, p.connected]) ?? []);
@@ -404,6 +426,7 @@ function PokerTable({
                   online={connected.get(p.id) ?? false}
                   catchable={canCatch && p.status === 'active' && p.cardCount === 1 && !p.calledUno}
                   onCatch={() => onCatch(p.id)}
+                  onTap={onSeatTap && ((rect) => onSeatTap({ id: p.id, name: p.name, rect }))}
                   compact={compact}
                 />
               </div>
@@ -412,7 +435,9 @@ function PokerTable({
             {/* You, at the bottom of the rail */}
             {me && (
               <div className="absolute top-full left-1/2 -translate-x-1/2 -translate-y-1/2">
-                <div className="flex items-center gap-2 rounded-full bg-zinc-900/95 py-1 pr-3 pl-1 whitespace-nowrap shadow-lg ring-1 ring-white/15">
+                <div
+                  data-anchor={`seat:${me.id}`}
+                  className="flex items-center gap-2 rounded-full bg-zinc-900/95 py-1 pr-3 pl-1 whitespace-nowrap shadow-lg ring-1 ring-white/15">
                   <Avatar
                     name={me.name}
                     size="sm"
@@ -478,6 +503,7 @@ function Seat({
   online,
   catchable,
   onCatch,
+  onTap,
   compact,
 }: {
   player: PublicPlayer;
@@ -485,6 +511,7 @@ function Seat({
   online: boolean;
   catchable: boolean;
   onCatch: () => void;
+  onTap?: (rect: DOMRect) => void;
   /** Avatar with a count badge and a small name, for crowded phone tables. */
   compact?: boolean;
 }) {
@@ -494,7 +521,7 @@ function Seat({
         data-anchor={`seat:${p.id}`}
         className={`flex w-14 flex-col items-center ${p.status !== 'active' ? 'opacity-60' : ''}`}
       >
-        <div className="relative">
+        <SeatTap name={p.name} onTap={onTap}>
           <Avatar name={p.name} size="sm" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
           <span
             className={`absolute -right-2 -bottom-1 rounded-full px-1 text-[0.6rem] font-black ring-2 ring-slate-900 ${
@@ -507,7 +534,7 @@ function Seat({
           >
             {p.status === 'won' ? 'WON' : p.status === 'eliminated' ? 'OUT' : p.cardCount}
           </span>
-        </div>
+        </SeatTap>
         <div
           className={`mt-1 max-w-full truncate rounded px-1 text-[0.65rem] font-bold ${
             isTurn ? 'bg-amber-300 text-slate-900' : 'bg-zinc-900/90'
@@ -532,7 +559,9 @@ function Seat({
       data-anchor={`seat:${p.id}`}
       className={`flex w-20 flex-col items-center sm:w-24 ${p.status !== 'active' ? 'opacity-60' : ''}`}
     >
-      <Avatar name={p.name} size="md" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
+      <SeatTap name={p.name} onTap={onTap}>
+        <Avatar name={p.name} size="md" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
+      </SeatTap>
       <div
         className={`-mt-2 w-full rounded-lg px-2 pt-2.5 pb-1.5 text-center shadow-lg ring-1 ${
           isTurn ? 'bg-zinc-900 ring-amber-300' : 'bg-zinc-900/95 ring-white/15'
@@ -562,6 +591,21 @@ function Seat({
         </button>
       )}
     </div>
+  );
+}
+
+/** Wraps a seat's avatar: tapping it opens the throw menu, when throwing is allowed. */
+function SeatTap({ name, onTap, children }: { name: string; onTap?: (rect: DOMRect) => void; children: React.ReactNode }) {
+  if (!onTap) return <div className="relative">{children}</div>;
+  return (
+    <button
+      className="relative rounded-full transition active:scale-90"
+      onClick={(e) => onTap(seatRectOf(e.currentTarget))}
+      aria-label={`Throw something at ${name}`}
+      title={`Throw something at ${name}`}
+    >
+      {children}
+    </button>
   );
 }
 

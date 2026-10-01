@@ -4,10 +4,13 @@ import { navigate } from '../App';
 import { useGame } from '../store';
 import { Avatar } from './Avatar';
 import { ChatButton, ChatPanel } from './Chat';
+import { TableFx } from './TableFx';
+import { seatRectOf, ThrowMenu, type ThrowTarget } from './ThrowMenu';
 
 export function Lobby() {
   const { room, playerId, send, leave } = useGame();
   const [copied, setCopied] = useState(false);
+  const [throwTarget, setThrowTarget] = useState<ThrowTarget | null>(null);
   if (!room) return null;
   const isHost = room.hostId === playerId;
   const me = room.players.find((p) => p.id === playerId);
@@ -44,7 +47,21 @@ export function Lobby() {
         <ul className="divide-y divide-white/5 rounded-2xl bg-white/5">
           {room.players.map((p) => (
             <li key={p.id} className="flex items-center gap-3 px-4 py-3">
-              <Avatar name={p.name} size="sm" online={p.connected} />
+              {p.id === playerId ? (
+                <span data-anchor={`seat:${p.id}`} className="rounded-full">
+                  <Avatar name={p.name} size="sm" online={p.connected} />
+                </span>
+              ) : (
+                <button
+                  data-anchor={`seat:${p.id}`}
+                  className="rounded-full transition active:scale-90"
+                  onClick={(e) => setThrowTarget({ id: p.id, name: p.name, rect: seatRectOf(e.currentTarget) })}
+                  aria-label={`Throw something at ${p.name}`}
+                  title={`Throw something at ${p.name}`}
+                >
+                  <Avatar name={p.name} size="sm" online={p.connected} />
+                </button>
+              )}
               <span className="flex-1 truncate">
                 {p.name}
                 {p.id === playerId && <span className="text-slate-500"> (you)</span>}
@@ -64,6 +81,9 @@ export function Lobby() {
             </li>
           ))}
         </ul>
+        {room.players.length > 1 && (
+          <p className="mt-2 text-center text-xs text-slate-500">Tap someone's avatar to throw something at them 👟🍅</p>
+        )}
       </section>
 
       <section className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
@@ -121,6 +141,8 @@ export function Lobby() {
           Leave room
         </button>
       </div>
+      {throwTarget && <ThrowMenu target={throwTarget} onClose={() => setThrowTarget(null)} />}
+      <TableFx />
       <ChatPanel />
     </div>
   );

@@ -1,4 +1,4 @@
-import type { Card as CardT } from '@nomercy/engine';
+import type { Card as CardT, Throwable } from '@nomercy/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   playCardDraw,
@@ -9,6 +9,7 @@ import {
   playRoundWon,
   playSkip,
   playStackGrew,
+  playThrow,
   playUnoCall,
   playUnoCaught,
   playWild,
@@ -23,12 +24,14 @@ import {
   scheduleEvents,
 } from '../fxTiming';
 import { useGame } from '../store';
+import { THROW_FLIGHT_MS, THROWABLE_INFO } from '../throwables';
 import { Card, CardBack } from './Card';
 
 /**
  * Animation layer for the game table. It listens to server event batches and
  * flies cards between on-screen anchors marked with `data-anchor`:
  * "draw", "discard", "hand", and "seat:<playerId>" for each opponent.
+ * It also plays throwables between seats, in the game and in the lobby.
  */
 
 interface Flight {
@@ -49,6 +52,17 @@ interface Float {
   delay: number;
 }
 
+interface ThrowFx {
+  id: number;
+  /** Null when the thrower isn't on screen: the item just lands. */
+  from: DOMRect | null;
+  to: DOMRect;
+  item: Throwable;
+  targetId: string;
+  /** The item hits you: the whole screen jolts. */
+  atMe: boolean;
+}
+
 /** Size of a flying card: matches the md card (w-16, 2:3). */
 const CARD_W = 64;
 const CARD_H = 96;
@@ -65,6 +79,11 @@ function cardRect(cardId: string): DOMRect | null {
   return el ? el.getBoundingClientRect() : null;
 }
 
+/** A player's spot: your hand while you hold one, otherwise your seat on the table or in the lobby. */
+function playerRect(id: string, me: string | null): DOMRect | null {
+  return (id === me ? anchorRect('hand') : null) ?? anchorRect(`seat:${id}`);
+}
+
 function reducedMotion(): boolean {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -74,6 +93,23 @@ export function TableFx() {
   const playerId = useGame((s) => s.playerId);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [floats, setFloats] = useState<Float[]>([]);
+  const [throws, setThrows] = useState<ThrowFx[]>([]);
+  const thrown = useGame((s) => s.thrown);
+  const lastThrown = useRef(thrown?.seq ?? 0);
+
+  // Something thrown at a player flies from the thrower's seat to theirs.
+  useEffect(() => {
+    if (!thrown || thrown.seq === lastThrown.current) return;
+    lastThrown.current = thrown.seq;
+    const to = playerRect(thrown.targetId, playerId);
+    if (!to) return;
+    const from = reducedMotion() ? null : playerRect(thrown.fromId, playerId);
+    playThrow(thrown.item, from ? THROW_FLIGHT_MS : 0);
+    setThrows((t) => [
+      ...t,
+      { id: nextId++, from, to, item: thrown.item, targetId: thrown.targetId, atMe: thrown.targetId === playerId },
+    ]);
+  }, [thrown, playerId]);
   const lastSeq = useRef(fx.seq);
   const reaction = useGame((s) => s.reaction);
   const lastChat = useGame((s) => s.chat.at(-1));
@@ -216,6 +252,9 @@ export function TableFx() {
       {flights.map((f) => (
         <FlyingCard key={f.id} flight={f} onDone={() => setFlights((all) => all.filter((x) => x.id !== f.id))} />
       ))}
+      {throws.map((t) => (
+        <ThrownItem key={t.id} fx={t} onDone={() => setThrows((all) => all.filter((x) => x.id !== t.id))} />
+      ))}
       {floats.map((f) => (
         <FloatingText key={f.id} float={f} onDone={() => setFloats((all) => all.filter((x) => x.id !== f.id))} />
       ))}
@@ -301,5 +340,180 @@ function FloatingText({ float, onDone }: { float: Float; onDone: () => void }) {
     >
       {text}
     </span>
+  );
+}
+
+/** One sprite of an impact: what it shows and how it moves, relative to the target's centre. */
+interface Sprite {
+  text: string;
+  size: number;
+  keyframes: Keyframe[];
+  duration: number;
+}
+
+function impactSprites(item: Throwable, still: boolean): Sprite[] {
+  const info = THROWABLE_INFO[item];
+  // Reduced motion: just fade the result in and out where it lands.
+  if (still) {
+    const fade = [{ opacity: 0 }, { opacity: 1, offset: 0.2 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }];
+    return [{ text: info.splat ?? (info.impact === 'love' ? '❤️' : '💥'), size: 44, keyframes: fade, duration: 1400 }];
+  }
+  switch (info.impact) {
+    case 'bonk':
+      return [
+        {
+          text: '💥',
+          size: 48,
+          duration: 650,
+          keyframes: [
+            { transform: 'scale(0.3)', opacity: 1 },
+            { transform: 'scale(1.4)', opacity: 1, offset: 0.35 },
+            { transform: 'scale(1.1)', opacity: 0 },
+          ],
+        },
+        {
+          // The item bounces off and drops away.
+          text: info.emoji,
+          size: 34,
+          duration: 700,
+          keyframes: [
+            { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+            { transform: 'translate(26px, -26px) rotate(140deg)', opacity: 1, offset: 0.35 },
+            { transform: 'translate(46px, 50px) rotate(320deg)', opacity: 0 },
+          ],
+        },
+      ];
+    case 'splat':
+      return [
+        {
+          text: info.splat ?? info.emoji,
+          size: 46,
+          duration: 1900,
+          keyframes: [
+            { transform: 'scale(0.4, 0.4)', opacity: 1 },
+            { transform: 'scale(1.7, 0.75)', opacity: 1, offset: 0.12 },
+            { transform: 'scale(1.5, 0.85)', opacity: 0.95, offset: 0.75 },
+            { transform: 'translate(0, 14px) scale(1.5, 0.85)', opacity: 0 },
+          ],
+        },
+      ];
+    case 'boom':
+      return [
+        {
+          text: '💥',
+          size: 64,
+          duration: 800,
+          keyframes: [
+            { transform: 'scale(0.2)', opacity: 1 },
+            { transform: 'scale(2.1)', opacity: 1, offset: 0.4 },
+            { transform: 'scale(2.4)', opacity: 0 },
+          ],
+        },
+        {
+          text: '💨',
+          size: 40,
+          duration: 1000,
+          keyframes: [
+            { transform: 'translate(0, 0) scale(0.6)', opacity: 0 },
+            { transform: 'translate(0, -20px) scale(1.4)', opacity: 0.9, offset: 0.4 },
+            { transform: 'translate(0, -50px) scale(1.8)', opacity: 0 },
+          ],
+        },
+      ];
+    case 'love':
+      return [-26, 0, 26].map((dx, i) => ({
+        text: '❤️',
+        size: 26 + (i === 1 ? 8 : 0),
+        duration: 1100 + i * 120,
+        keyframes: [
+          { transform: 'translate(0, 0) scale(0.3)', opacity: 0 },
+          { transform: `translate(${dx * 0.5}px, -16px) scale(1.1)`, opacity: 1, offset: 0.3 },
+          { transform: `translate(${dx}px, -64px) scale(0.9)`, opacity: 0 },
+        ],
+      }));
+  }
+}
+
+/** A throwable flying in an arc between two seats, then its impact on the target. */
+function ThrownItem({ fx, onDone }: { fx: ThrowFx; onDone: () => void }) {
+  const flier = useRef<HTMLSpanElement>(null);
+  const sprites = useRef<(HTMLSpanElement | null)[]>([]);
+  const [landed, setLanded] = useState(!fx.from);
+  const still = reducedMotion();
+  const list = impactSprites(fx.item, still);
+  const info = THROWABLE_INFO[fx.item];
+  const cx = fx.to.left + fx.to.width / 2;
+  const cy = fx.to.top + Math.min(fx.to.height, 80) / 2;
+
+  // Flight: an arc that peaks above both seats, spinning end over end (a rose just drifts).
+  useLayoutEffect(() => {
+    const el = flier.current;
+    const { from } = fx;
+    if (!el || !from) return;
+    const dx = cx - (from.left + from.width / 2);
+    const dy = cy - (from.top + Math.min(from.height, 80) / 2);
+    const lift = Math.min(160, 60 + Math.hypot(dx, dy) * 0.25);
+    const spin = info.impact === 'love' ? 30 : dx >= 0 ? 720 : -720;
+    const anim = el.animate(
+      [
+        { transform: 'translate(0, 0) rotate(0deg) scale(0.8)' },
+        { transform: `translate(${dx * 0.5}px, ${dy * 0.5 - lift}px) rotate(${spin / 2}deg) scale(1.25)`, offset: 0.5 },
+        { transform: `translate(${dx}px, ${dy}px) rotate(${spin}deg) scale(1)` },
+      ],
+      { duration: THROW_FLIGHT_MS, easing: 'cubic-bezier(.35,.1,.45,1)', fill: 'both' },
+    );
+    anim.finished.then(() => setLanded(true), () => {});
+    return () => anim.cancel();
+  }, []);
+
+  // Impact: the target's seat (or the whole screen, if it's you) shakes, and the hit plays out.
+  useLayoutEffect(() => {
+    if (!landed) return;
+    if (!still && info.impact !== 'love') {
+      const hard = info.impact === 'boom' ? 9 : 5;
+      const shake = (el: Element | null, px: number) =>
+        el?.animate(
+          [0, -px, px, -px * 0.6, px * 0.6, 0].map((x) => ({ transform: `translateX(${x}px)` })),
+          { duration: 380, easing: 'ease-out' },
+        );
+      if (fx.atMe) shake(document.getElementById('root'), hard * 0.6);
+      else shake(document.querySelector(`[data-anchor="${CSS.escape(`seat:${fx.targetId}`)}"]`), hard);
+    }
+    const anims = list.map((s, i) => sprites.current[i]?.animate(s.keyframes, { duration: s.duration, fill: 'both' }));
+    Promise.all(anims.map((a) => a?.finished)).then(onDone, () => {});
+    return () => anims.forEach((a) => a?.cancel());
+  }, [landed]);
+
+  return (
+    <>
+      {fx.from && !landed && (
+        <span
+          ref={flier}
+          className="absolute -translate-x-1/2 -translate-y-1/2 text-4xl leading-none drop-shadow-[0_6px_10px_rgba(0,0,0,0.55)]"
+          style={{ left: fx.from.left + fx.from.width / 2, top: fx.from.top + Math.min(fx.from.height, 80) / 2 }}
+        >
+          {info.emoji}
+        </span>
+      )}
+      {landed &&
+        list.map((s, i) => (
+          <span
+            key={i}
+            className="absolute leading-none drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]"
+            // Centre each sprite on the target; its keyframes move it from there.
+            style={{ left: cx - s.size / 2, top: cy - s.size / 2, width: s.size, height: s.size, fontSize: s.size * 0.85, textAlign: 'center' }}
+          >
+            <span
+              ref={(el) => {
+                sprites.current[i] = el;
+              }}
+              className="inline-block"
+              style={{ opacity: 0 }}
+            >
+              {s.text}
+            </span>
+          </span>
+        ))}
+    </>
   );
 }

@@ -9,6 +9,7 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   REACTION_COOLDOWN_MS,
+  THROW_COOLDOWN_MS,
   CHAT_COOLDOWN_MS,
   CHAT_HISTORY,
   type ChatMessage,
@@ -74,6 +75,7 @@ export class Room extends DurableObject<Env> {
   private rate = new WeakMap<WebSocket, { windowStart: number; count: number }>();
   /** Last reaction time per player; in memory only, so it resets on hibernation. */
   private lastReaction = new Map<string, number>();
+  private lastThrow = new Map<string, number>();
   private lastChat = new Map<string, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -244,6 +246,22 @@ export class Room extends DurableObject<Env> {
         const reaction: ServerMessage = { type: 'reaction', playerId: seat.id, emoji: msg.payload.emoji };
         for (const ws of this.ctx.getWebSockets()) this.send(ws, reaction);
         // Reactions are fire-and-forget: nothing to save or re-broadcast.
+        return;
+      }
+
+      case 'room:throw': {
+        const seat = this.requireSeat(me);
+        const target = this.seat(msg.payload.targetId);
+        if (!target) throw new RoomError('bad_target', 'That player is not here');
+        if (target.id === seat.id) throw new RoomError('bad_target', 'You cannot throw at yourself');
+        const now = Date.now();
+        if (now - (this.lastThrow.get(seat.id) ?? 0) < THROW_COOLDOWN_MS) {
+          throw new RoomError('slow_down', 'Catch your breath before throwing again');
+        }
+        this.lastThrow.set(seat.id, now);
+        const out: ServerMessage = { type: 'throw', fromId: seat.id, targetId: target.id, item: msg.payload.item };
+        for (const ws of this.ctx.getWebSockets()) this.send(ws, out);
+        // Like reactions, throws are fire-and-forget.
         return;
       }
 

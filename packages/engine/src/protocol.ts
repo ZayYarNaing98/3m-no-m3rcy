@@ -19,6 +19,7 @@ export type ClientMessage = { requestId?: string } & (
   | { type: 'room:lobby'; payload: Record<string, never> }
   | { type: 'room:ready'; payload: { ready: boolean } }
   | { type: 'room:react'; payload: { emoji: Reaction } }
+  | { type: 'room:throw'; payload: { targetId: string; item: Throwable } }
   | { type: 'room:chat'; payload: { text: string } }
 );
 
@@ -62,6 +63,7 @@ export type ServerMessage =
   | { type: 'game:state'; game: PlayerView; stateVersion: number; deadline: number | null }
   | { type: 'game:events'; events: GameEvent[] }
   | { type: 'reaction'; playerId: string; emoji: Reaction }
+  | { type: 'throw'; fromId: string; targetId: string; item: Throwable }
   | { type: 'chat'; message: ChatMessage }
   | { type: 'chat:history'; messages: ChatMessage[] }
   | { type: 'error'; error: ErrorInfo };
@@ -82,6 +84,12 @@ export const REACTIONS = [
 export type Reaction = (typeof REACTIONS)[number];
 /** Minimum gap between one player's reactions. */
 export const REACTION_COOLDOWN_MS = 600;
+
+/** Things players can throw at each other. The server only relays these. */
+export const THROWABLES = ['shoe', 'stone', 'hammer', 'tomato', 'egg', 'bomb', 'rose', 'water'] as const;
+export type Throwable = (typeof THROWABLES)[number];
+/** Minimum gap between one player's throws. */
+export const THROW_COOLDOWN_MS = 1500;
 
 export interface ChatMessage {
   id: string;

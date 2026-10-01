@@ -1,4 +1,4 @@
-import { CHAT_MAX_LENGTH, COLORS, REACTIONS, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
+import { CHAT_MAX_LENGTH, COLORS, REACTIONS, THROWABLES, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
 import { z } from 'zod';
 
 const id = z.string().min(1).max(64);
@@ -35,6 +35,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   msg('room:lobby', empty),
   msg('room:ready', z.object({ ready: z.boolean() })),
   msg('room:react', z.object({ emoji: z.enum(REACTIONS) })),
+  msg('room:throw', z.object({ targetId: id, item: z.enum(THROWABLES) })),
   msg(
     'room:chat',
     z.object({

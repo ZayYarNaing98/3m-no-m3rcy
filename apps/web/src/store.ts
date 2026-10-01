@@ -7,6 +7,7 @@ import {
   type Reaction,
   type RoomView,
   type ServerMessage,
+  type Throwable,
 } from '@nomercy/engine';
 import { create } from 'zustand';
 import { describeEvent } from './events';
@@ -35,6 +36,8 @@ interface State {
   fx: { seq: number; events: GameEvent[] };
   /** Latest emoji reaction from anyone at the table. */
   reaction: { seq: number; playerId: string; emoji: Reaction } | null;
+  /** Latest thing one player threw at another. */
+  thrown: { seq: number; fromId: string; targetId: string; item: Throwable } | null;
   chat: ChatMessage[];
   chatOpen: boolean;
   /** Messages from others that arrived while the chat panel was closed. */
@@ -50,6 +53,7 @@ interface State {
   join(name: string): Promise<Ack>;
   leave(): Promise<void>;
   react(emoji: Reaction): Promise<Ack>;
+  throwAt(targetId: string, item: Throwable): Promise<Ack>;
   sendChat(text: string): Promise<Ack>;
   setChatOpen(open: boolean): void;
   showToast(message: string): void;
@@ -98,6 +102,7 @@ export const useGame = create<State>((set, get) => ({
   log: [],
   fx: { seq: 0, events: [] },
   reaction: null,
+  thrown: null,
   chat: [],
   chatOpen: false,
   chatUnread: 0,
@@ -195,6 +200,10 @@ export const useGame = create<State>((set, get) => ({
 
   react(emoji) {
     return get().send('room:react', { emoji });
+  },
+
+  throwAt(targetId, item) {
+    return get().send('room:throw', { targetId, item });
   },
 
   sendChat(text) {
@@ -315,6 +324,11 @@ function handleMessage(msg: ServerMessage) {
     }
     case 'reaction':
       set({ reaction: { seq: (get().reaction?.seq ?? 0) + 1, playerId: msg.playerId, emoji: msg.emoji } });
+      break;
+    case 'throw':
+      set({
+        thrown: { seq: (get().thrown?.seq ?? 0) + 1, fromId: msg.fromId, targetId: msg.targetId, item: msg.item },
+      });
       break;
     case 'error':
       get().showToast(msg.error.message);

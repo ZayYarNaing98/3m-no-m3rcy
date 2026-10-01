@@ -155,6 +155,39 @@ describe('room over WebSocket', () => {
     expect(a.latest('room:state')!.room.players.every((p) => !p.ready)).toBe(true);
   });
 
+  it('relays throws between seated players with a cooldown', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const b = await connect(code);
+    const watcher = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    await b.request('room:join', { name: 'Ben' });
+    const ben = await b.waitFor((m): m is Extract<ServerMessage, { type: 'welcome' }> => m.type === 'welcome');
+    const ana = await a.waitFor((m): m is Extract<ServerMessage, { type: 'welcome' }> => m.type === 'welcome');
+
+    expect((await a.request('room:throw', { targetId: ben.playerId, item: 'shoe' })).ok).toBe(true);
+    const seen = await watcher.waitFor((m): m is Extract<ServerMessage, { type: 'throw' }> => m.type === 'throw');
+    expect(seen).toMatchObject({ fromId: ana.playerId, targetId: ben.playerId, item: 'shoe' });
+    await b.waitFor((m) => m.type === 'throw');
+
+    expect(await a.request('room:throw', { targetId: ben.playerId, item: 'egg' })).toMatchObject({
+      ok: false,
+      error: { code: 'slow_down' },
+    });
+    expect(await b.request('room:throw', { targetId: ben.playerId, item: 'egg' })).toMatchObject({
+      ok: false,
+      error: { code: 'bad_target' },
+    });
+    expect(await b.request('room:throw', { targetId: ana.playerId, item: 'sword' })).toMatchObject({
+      ok: false,
+      error: { code: 'bad_message' },
+    });
+    expect(await watcher.request('room:throw', { targetId: ana.playerId, item: 'rose' })).toMatchObject({
+      ok: false,
+      error: { code: 'not_seated' },
+    });
+  });
+
   it('rejects invalid messages', async () => {
     const code = await createRoom();
     const a = await connect(code);
