@@ -17,6 +17,7 @@ export type ClientMessage = { requestId?: string } & (
   | { type: 'game:callUno'; payload: Record<string, never> }
   | { type: 'game:catchUno'; payload: { targetId: string } }
   | { type: 'game:rematch'; payload: Record<string, never> }
+  | { type: 'room:lobby'; payload: Record<string, never> }
   | { type: 'room:react'; payload: { emoji: Reaction } }
   | { type: 'room:chat'; payload: { text: string } }
 );

@@ -272,6 +272,18 @@ export class Room extends DurableObject<Env> {
         room.settings = { turnSeconds: msg.payload.turnSeconds };
         break;
 
+      case 'room:lobby': {
+        this.requireHost(me);
+        if (room.status !== 'finished') throw new RoomError('game_in_progress', 'Finish the game first');
+        // Seats given up mid-game are dropped so the lobby shows who is still here.
+        room.seats = this.seated();
+        room.game = null;
+        room.deadline = null;
+        room.status = 'lobby';
+        room.stateVersion++;
+        break;
+      }
+
       case 'game:start':
       case 'game:rematch': {
         this.requireHost(me);

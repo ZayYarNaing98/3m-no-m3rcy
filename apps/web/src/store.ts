@@ -40,6 +40,8 @@ interface State {
   /** Messages from others that arrived while the chat panel was closed. */
   chatUnread: number;
   toast: string | null;
+  /** This player left the results screen for the lobby while the host decides what's next. */
+  lobbyView: boolean;
   closedReason: string | null;
 
   connect(code: string): void;
@@ -51,6 +53,7 @@ interface State {
   sendChat(text: string): Promise<Ack>;
   setChatOpen(open: boolean): void;
   showToast(message: string): void;
+  setLobbyView(lobbyView: boolean): void;
 }
 
 const seatKey = (code: string) => `nomercy:seat:${code}`;
@@ -99,6 +102,7 @@ export const useGame = create<State>((set, get) => ({
   chatOpen: false,
   chatUnread: 0,
   toast: null,
+  lobbyView: false,
   closedReason: null,
 
   connect(code) {
@@ -197,6 +201,10 @@ export const useGame = create<State>((set, get) => ({
     return get().send('room:chat', { text });
   },
 
+  setLobbyView(lobbyView) {
+    set({ lobbyView });
+  },
+
   setChatOpen(open) {
     set(open ? { chatOpen: true, chatUnread: 0 } : { chatOpen: false });
   },
@@ -257,6 +265,7 @@ function freshRoom() {
     chat: [],
     chatOpen: false,
     chatUnread: 0,
+    lobbyView: false,
   };
 }
 
@@ -276,6 +285,7 @@ function handleMessage(msg: ServerMessage) {
       break;
     }
     case 'room:state':
+      if (msg.room.status === 'playing') set({ lobbyView: false });
       setTable({ room: msg.room });
       break;
     case 'game:state':

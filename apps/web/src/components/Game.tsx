@@ -865,12 +865,19 @@ function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
         ))}
       </ol>
       <div className="mt-5 flex flex-col gap-2">
-        {isHost ? (
+        {isHost && (
           <button className="btn-primary" onClick={() => send('game:rematch')}>
             Rematch
           </button>
-        ) : (
-          <p className="text-center text-sm text-slate-400">Waiting for the host to start a rematch…</p>
+        )}
+        {seated && (
+          <button
+            className={isHost ? 'btn-secondary' : 'btn-primary'}
+            // The host takes the whole room back, reopening it to new players; others just go wait there.
+            onClick={() => (isHost ? send('room:lobby') : useGame.getState().setLobbyView(true))}
+          >
+            Return to lobby
+          </button>
         )}
         <button
           className="btn-secondary"

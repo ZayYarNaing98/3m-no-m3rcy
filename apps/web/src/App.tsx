@@ -40,7 +40,7 @@ export function App() {
 }
 
 function RoomScreen({ code }: { code: string }) {
-  const { conn, ready, playerId, room, game, closedReason, connect } = useGame();
+  const { conn, ready, playerId, room, game, lobbyView, closedReason, connect } = useGame();
   const [watching, setWatching] = useState(false);
 
   useEffect(() => {
@@ -86,7 +86,7 @@ function RoomScreen({ code }: { code: string }) {
     }
     return <JoinForm room={room} />;
   }
-  if (room.status === 'lobby' || !game) return <Lobby />;
+  if (room.status === 'lobby' || !game || (lobbyView && room.status === 'finished')) return <Lobby />;
   return <Game />;
 }
 

@@ -121,6 +121,30 @@ describe('room over WebSocket', () => {
     expect(bad).toMatchObject({ ok: false, error: { code: 'unknown_token' } });
   });
 
+  it('lets the host take a finished room back to the lobby', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const b = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    await b.request('room:join', { name: 'Ben' });
+    await a.request('game:start');
+    expect(await a.request('room:lobby')).toMatchObject({ ok: false, error: { code: 'game_in_progress' } });
+
+    // Ben forfeits, so Ana wins and the room is finished.
+    await b.request('room:leave');
+    await a.waitFor((m): m is Extract<ServerMessage, { type: 'room:state' }> => m.type === 'room:state' && m.room.status === 'finished');
+    expect((await b.request('room:lobby')).ok).toBe(false);
+
+    expect((await a.request('room:lobby')).ok).toBe(true);
+    const lobby = a.latest('room:state')!.room;
+    expect(lobby.status).toBe('lobby');
+    expect(lobby.players.map((p) => p.name)).toEqual(['Ana']);
+
+    const c = await connect(code);
+    expect((await c.request('room:join', { name: 'Cy' })).ok).toBe(true);
+    expect((await a.request('game:start')).ok).toBe(true);
+  });
+
   it('rejects invalid messages', async () => {
     const code = await createRoom();
     const a = await connect(code);
