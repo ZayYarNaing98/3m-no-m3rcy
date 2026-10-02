@@ -9,7 +9,10 @@ body,
 body {
   font-family: ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
   color: #f1f5f9;
-  background: radial-gradient(ellipse at top, #1e293b 0%, #020617 70%);
+  /* Painted once over the first screen; long pages (a full lobby) continue in the gradient's end colour
+     instead of repeating it, which showed as a light band partway down. */
+  background: #020617 radial-gradient(ellipse at top, #1e293b 0%, #020617 70%) no-repeat;
+  background-size: 100% 100vh;
   -webkit-tap-highlight-color: transparent;
 }
 
