@@ -1,4 +1,4 @@
-import { CHAT_MAX_LENGTH, COLORS, REACTIONS, THROWABLES, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
+import { CHAT_MAX_LENGTH, COLORS, MATCH_MINUTES_OPTIONS, REACTIONS, THROWABLES, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
 import { z } from 'zod';
 
 const id = z.string().min(1).max(64);
@@ -21,7 +21,12 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
     z.object({
       turnSeconds: z
         .number()
-        .refine((n) => (TURN_SECONDS_OPTIONS as readonly number[]).includes(n), 'Unsupported turn length'),
+        .refine((n) => (TURN_SECONDS_OPTIONS as readonly number[]).includes(n), 'Unsupported turn length')
+        .optional(),
+      matchMinutes: z
+        .number()
+        .refine((n) => (MATCH_MINUTES_OPTIONS as readonly number[]).includes(n), 'Unsupported match length')
+        .optional(),
     }),
   ),
   msg('game:start', empty),

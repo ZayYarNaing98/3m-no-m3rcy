@@ -197,6 +197,51 @@ describe('room over WebSocket', () => {
 });
 
 describe('room persistence and timers', () => {
+  it('ends the game when the match clock runs out', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const b = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    await b.request('room:join', { name: 'Ben' });
+    expect(await b.request('room:settings', { matchMinutes: 10 })).toMatchObject({ ok: false, error: { code: 'not_host' } });
+    expect(await a.request('room:settings', { matchMinutes: 7 })).toMatchObject({ ok: false, error: { code: 'bad_message' } });
+    expect((await a.request('room:settings', { matchMinutes: 10 })).ok).toBe(true);
+    // Changing one setting keeps the other.
+    expect(a.latest('room:state')!.room.settings).toEqual({ turnSeconds: 30, matchMinutes: 10 });
+
+    await b.request('room:ready', { ready: true });
+    await a.request('game:start');
+    const started = await a.waitFor(
+      (m): m is Extract<ServerMessage, { type: 'room:state' }> => m.type === 'room:state' && m.room.status === 'playing',
+    );
+    expect(started.room.matchEndsAt).toBeGreaterThan(Date.now() + 9 * 60_000);
+    expect((await a.request('room:settings', { matchMinutes: 5 })).ok).toBe(false);
+
+    const stub = env.ROOMS.getByName(code);
+    await runInDurableObject(stub, (instance: Room, state) => {
+      const row = state.storage.sql.exec<{ data: string }>('SELECT data FROM room WHERE id = 1').one();
+      const room = JSON.parse(row.data);
+      room.matchEndsAt = Date.now() - 1000;
+      state.storage.sql.exec('UPDATE room SET data = ? WHERE id = 1', JSON.stringify(room));
+      (instance as unknown as { room: unknown }).room = room;
+    });
+
+    const from = a.msgs.length;
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    const events = await a.waitFor(
+      (m): m is Extract<ServerMessage, { type: 'game:events' }> => m.type === 'game:events',
+      from,
+    );
+    expect(events.events.map((e) => e.type)).toEqual(['timeUp', 'won']);
+    const finished = await a.waitFor(
+      (m): m is Extract<ServerMessage, { type: 'room:state' }> => m.type === 'room:state' && m.room.status === 'finished',
+      from,
+    );
+    expect(finished.room.matchEndsAt).toBeNull();
+    const game = a.latest('game:state')!.game;
+    expect(game.phase).toMatchObject({ kind: 'roundOver' });
+  });
+
   it('stores state in SQLite and times out the current player on the alarm', async () => {
     const code = await createRoom();
     const a = await connect(code);

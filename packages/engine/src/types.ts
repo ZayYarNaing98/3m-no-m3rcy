@@ -44,7 +44,8 @@ export type Phase =
   | { kind: 'chooseColor'; cardId: string }
   | { kind: 'chooseSwapTarget' }
   | { kind: 'rouletteNameColor' }
-  | { kind: 'roundOver'; winnerId: string };
+  /** `timeUp` is set when the match clock ran out: the winner had the fewest cards, then the fewest points. */
+  | { kind: 'roundOver'; winnerId: string; timeUp?: { points: Record<string, number> } };
 
 export type PhaseKind = Phase['kind'];
 
@@ -95,6 +96,7 @@ export type GameEvent =
   | { type: 'reshuffled'; count: number }
   | { type: 'timedOut'; playerId: string }
   | { type: 'forfeited'; playerId: string }
+  | { type: 'timeUp' }
   | { type: 'won'; playerId: string };
 
 export interface StepResult {

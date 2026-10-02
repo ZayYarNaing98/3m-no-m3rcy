@@ -72,6 +72,7 @@ export function Game() {
               👀 <span className="tabular-nums">{room.spectators}</span>
             </span>
           )}
+          {room.matchEndsAt && !finished && <MatchClock endsAt={room.matchEndsAt} />}
           <span className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-slate-100 ring-1 ring-white/15">
             Turn <span className="tabular-nums">{game.turn}</span>
           </span>
@@ -187,6 +188,34 @@ export function Game() {
 }
 
 /** A smiley toggle that opens a small emoji panel above it. */
+/** Match countdown chip; turns red and pulses for the last minute. */
+function MatchClock({ endsAt }: { endsAt: number }) {
+  const [now, setNow] = useState(Date.now);
+  const warned = useRef(false);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const left = Math.max(0, Math.ceil((endsAt - now) / 1000));
+  const urgent = left <= 60;
+  useEffect(() => {
+    if (urgent && left > 0 && !warned.current) {
+      warned.current = true;
+      useGame.getState().showToast('⏱ 1 minute left!');
+    }
+  }, [urgent, left]);
+  return (
+    <span
+      className={`rounded-full px-3 py-1.5 font-semibold tabular-nums ring-1 ${
+        urgent ? 'animate-pulse bg-red-600/25 text-red-200 ring-red-500/70' : 'bg-white/10 text-slate-100 ring-white/15'
+      }`}
+      aria-label={`${Math.floor(left / 60)} minutes ${left % 60} seconds left in the match`}
+    >
+      ⏱ {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}
+    </span>
+  );
+}
+
 function ReactionPicker() {
   const react = useGame((s) => s.react);
   const [open, setOpen] = useState(false);
@@ -908,17 +937,22 @@ function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
   const { send, leave, playerId } = useGame();
   const seated = game.players.some((p) => p.id === playerId);
   const winnerId = game.phase.kind === 'roundOver' ? game.phase.winnerId : undefined;
+  // Set when the match clock ran out: ranked by cards, then card points.
+  const points = game.phase.kind === 'roundOver' ? game.phase.timeUp?.points : undefined;
   const winner = game.players.find((p) => p.id === winnerId);
   const name = (id: string) => (id === playerId ? 'You' : (game.players.find((p) => p.id === id)?.name ?? '?'));
   const others = game.players.filter((p) => p.id !== winnerId && !game.eliminationOrder.includes(p.id));
   const ranking = [
     ...(winner ? [winner.id] : []),
-    ...others.sort((a, b) => a.cardCount - b.cardCount).map((p) => p.id),
+    ...others.sort((a, b) => a.cardCount - b.cardCount || (points?.[a.id] ?? 0) - (points?.[b.id] ?? 0)).map((p) => p.id),
     ...[...game.eliminationOrder].reverse(),
   ];
 
   return (
-    <Sheet title={winner ? `${name(winner.id)} ${winner.id === playerId ? 'win' : 'wins'}!` : 'Round over'}>
+    <Sheet
+      title={`${points ? "⏱ Time's up! " : ''}${winner ? `${name(winner.id)} ${winner.id === playerId ? 'win' : 'wins'}!` : 'Round over'}`}
+      subtitle={points ? 'Fewest cards wins; a tie goes to the fewest card points.' : undefined}
+    >
       <ol className="space-y-1 text-sm">
         {ranking.map((id, i) => (
           <li key={id} className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5">
@@ -926,7 +960,13 @@ function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
             <Avatar name={game.players.find((p) => p.id === id)?.name ?? '?'} size="xs" />
             <span className="flex-1">{name(id)}</span>
             <span className="text-slate-400">
-              {game.eliminationOrder.includes(id) ? 'eliminated' : i === 0 ? 'winner' : `${game.players.find((p) => p.id === id)?.cardCount} cards`}
+              {game.eliminationOrder.includes(id)
+                ? 'eliminated'
+                : points
+                  ? `${game.players.find((p) => p.id === id)?.cardCount} cards · ${points[id] ?? 0} pts`
+                  : i === 0
+                    ? 'winner'
+                    : `${game.players.find((p) => p.id === id)?.cardCount} cards`}
             </span>
           </li>
         ))}

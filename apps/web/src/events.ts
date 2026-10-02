@@ -56,6 +56,8 @@ export function describeEvent(e: GameEvent, name: (id: string) => string): strin
       return `${name(e.playerId)} ran out of time`;
     case 'forfeited':
       return `${name(e.playerId)} left the game`;
+    case 'timeUp':
+      return "⏱ Time's up!";
     case 'won':
       return `${name(e.playerId)} won the round!`;
   }

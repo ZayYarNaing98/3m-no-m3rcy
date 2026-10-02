@@ -7,7 +7,7 @@ export type ClientMessage = { requestId?: string } & (
   | { type: 'room:rejoin'; payload: { playerToken: string } }
   | { type: 'room:leave'; payload: Record<string, never> }
   | { type: 'room:kick'; payload: { playerId: string } }
-  | { type: 'room:settings'; payload: { turnSeconds: number } }
+  | { type: 'room:settings'; payload: { turnSeconds?: number; matchMinutes?: number } }
   | { type: 'game:start'; payload: Record<string, never> }
   | { type: 'game:play'; payload: { cardId: string; stateVersion: number } }
   | { type: 'game:draw'; payload: { stateVersion: number } }
@@ -34,6 +34,8 @@ export type RoomStatus = 'lobby' | 'playing' | 'finished';
 
 export interface RoomSettings {
   turnSeconds: number;
+  /** Match time limit in minutes; 0 means no limit. */
+  matchMinutes: number;
 }
 
 export interface RoomPlayerView {
@@ -53,6 +55,8 @@ export interface RoomView {
   players: RoomPlayerView[];
   /** Connections watching without a seat. */
   spectators: number;
+  /** When the running game's match clock runs out (server time in ms), or null without a limit. */
+  matchEndsAt: number | null;
 }
 
 export type ServerMessage =
@@ -73,6 +77,7 @@ export const MAX_PLAYERS = 10;
 export const DEFAULT_TURN_SECONDS = 30;
 export const TURN_SECONDS_OPTIONS = [15, 30, 45, 60, 90] as const;
 export const AFK_STRIKES = 3;
+export const MATCH_MINUTES_OPTIONS = [0, 5, 10, 15, 20] as const;
 
 /** Emoji players can send to the table. The server only relays these. */
 export const REACTIONS = [

@@ -2,6 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   AFK_STRIKES,
   applyAction,
+  endByTime,
   createGame,
   current,
   DEFAULT_TURN_SECONDS,
@@ -52,6 +53,8 @@ interface RoomRecord {
   game: GameState | null;
   stateVersion: number;
   deadline: number | null;
+  /** When the match clock runs out; optional so rooms saved before it existed still load. */
+  matchEndsAt?: number | null;
   emptySince: number | null;
   /** Recent chat, oldest first. Optional so rooms saved before chat existed still load. */
   chat?: ChatMessage[];
@@ -96,7 +99,7 @@ export class Room extends DurableObject<Env> {
       code,
       hostId: '',
       status: 'lobby',
-      settings: { turnSeconds: DEFAULT_TURN_SECONDS },
+      settings: { turnSeconds: DEFAULT_TURN_SECONDS, matchMinutes: 0 },
       seats: [],
       game: null,
       stateVersion: 0,
@@ -165,7 +168,10 @@ export class Room extends DurableObject<Env> {
     if (!room) return;
     const now = Date.now();
 
-    if (room.status === 'playing' && room.game && room.deadline !== null && now >= room.deadline - 50) {
+    if (room.status === 'playing' && room.game && room.matchEndsAt && now >= room.matchEndsAt - 50) {
+      const { state, events } = endByTime(room.game);
+      this.commit(state, events);
+    } else if (room.status === 'playing' && room.game && room.deadline !== null && now >= room.deadline - 50) {
       const seat = this.seat(current(room.game).id);
       if (seat) seat.afkStrikes++;
       this.runAction(current(room.game).id, { type: 'timeout' });
@@ -290,7 +296,10 @@ export class Room extends DurableObject<Env> {
       case 'room:settings':
         this.requireHost(me);
         if (room.status === 'playing') throw new RoomError('game_in_progress', 'Change settings between games');
-        room.settings = { turnSeconds: msg.payload.turnSeconds };
+        room.settings = {
+          turnSeconds: msg.payload.turnSeconds ?? room.settings.turnSeconds,
+          matchMinutes: msg.payload.matchMinutes ?? room.settings.matchMinutes ?? 0,
+        };
         break;
 
       case 'room:lobby': {
@@ -332,6 +341,8 @@ export class Room extends DurableObject<Env> {
         }
         room.status = 'playing';
         room.stateVersion++;
+        const minutes = room.settings.matchMinutes ?? 0;
+        room.matchEndsAt = minutes > 0 ? Date.now() + minutes * 60_000 : null;
         this.resetDeadline();
         this.broadcastRoom();
         this.broadcastGame([]);
@@ -364,14 +375,21 @@ export class Room extends DurableObject<Env> {
   private runAction(playerId: string, action: Action): void {
     const room = this.requireRoom();
     const game = room.game as GameState;
-    const before = turnKey(game);
     const { state, events } = applyAction(game, playerId, action);
+    this.commit(state, events);
+  }
+
+  /** Stores a new game state, updates timers and status, and broadcasts. */
+  private commit(state: GameState, events: GameEvent[]): void {
+    const room = this.requireRoom();
+    const before = turnKey(room.game as GameState);
     room.game = state;
     room.stateVersion++;
 
     if (state.phase.kind === 'roundOver') {
       room.status = 'finished';
       room.deadline = null;
+      room.matchEndsAt = null;
     } else if (turnKey(state) !== before) {
       this.resetDeadline();
     }
@@ -430,6 +448,7 @@ export class Room extends DurableObject<Env> {
     if (!room) return;
     const times: number[] = [];
     if (room.status === 'playing' && room.deadline !== null) times.push(room.deadline);
+    if (room.status === 'playing' && room.matchEndsAt) times.push(room.matchEndsAt);
     if (this.connectedIds().size === 0) {
       room.emptySince ??= Date.now();
       times.push(room.emptySince + EMPTY_ROOM_TTL_MS);
@@ -449,7 +468,7 @@ export class Room extends DurableObject<Env> {
       code: room.code,
       hostId: room.hostId,
       status: room.status,
-      settings: room.settings,
+      settings: { ...room.settings, matchMinutes: room.settings.matchMinutes ?? 0 },
       players: this.seated().map((s) => ({
         id: s.id,
         name: s.name,
@@ -458,6 +477,7 @@ export class Room extends DurableObject<Env> {
         ready: !!s.ready,
       })),
       spectators: this.ctx.getWebSockets().filter((ws) => ws !== exclude && !this.attachment(ws).playerId).length,
+      matchEndsAt: room.status === 'playing' ? (room.matchEndsAt ?? null) : null,
     };
   }
 

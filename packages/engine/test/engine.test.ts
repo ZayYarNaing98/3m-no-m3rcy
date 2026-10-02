@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyAction,
   buildDeck,
+  endByTime,
   createGame,
   DECK_SIZE,
   EngineError,
@@ -433,5 +434,58 @@ describe('playerView', () => {
     expect(v.hand).toHaveLength(1);
     expect(v.players[1]?.cardCount).toBe(2);
     expect(JSON.stringify(v)).not.toContain(s.players[1]?.hand[0]?.id + '"');
+  });
+});
+
+describe('match clock', () => {
+  it('fewest cards wins when time is up', () => {
+    const s = makeState({
+      hands: [
+        [[R, 'number', 1], [R, 'number', 2], [R, 'number', 3]],
+        [[null, 'wildDraw10'], [B, 'number', 9]],
+        [[Y, 'number', 1], [Y, 'number', 2], [Y, 'number', 3], [Y, 'number', 4]],
+      ],
+      top: [G, 'number', 5],
+    });
+    const { state, events } = endByTime(s);
+    expect(events.map((e) => e.type)).toEqual(['timeUp', 'won']);
+    expect(state.phase).toEqual({ kind: 'roundOver', winnerId: 'p1', timeUp: { points: { p0: 6, p1: 59, p2: 10 } } });
+    expect(state.players[1]?.status).toBe('won');
+  });
+
+  it('breaks a tie on cards with the lowest card points, then the earlier seat', () => {
+    const s = makeState({
+      hands: [
+        [[null, 'wildDraw6'], [R, 'number', 1]],
+        [[B, 'skip'], [B, 'number', 2]],
+        [[G, 'number', 9], [G, 'number', 8]],
+      ],
+      top: [Y, 'number', 5],
+    });
+    // p0 = 51, p1 = 22, p2 = 17 points: p2 wins.
+    expect(endByTime(s).state.phase).toMatchObject({ winnerId: 'p2' });
+
+    const tied = makeState({
+      hands: [[[R, 'number', 4]], [[B, 'number', 4]]],
+      top: [Y, 'number', 5],
+    });
+    expect(endByTime(tied).state.phase).toMatchObject({ winnerId: 'p0' });
+  });
+
+  it('ignores eliminated players and drops a pending stack', () => {
+    let s = makeState({
+      hands: [
+        [[R, 'draw4'], [R, 'number', 1], [R, 'number', 2]],
+        [[B, 'number', 1], [B, 'number', 2], [B, 'number', 3], [B, 'number', 4]],
+        [[G, 'number', 1]],
+      ],
+      top: [R, 'number', 5],
+    });
+    s = { ...s, players: s.players.map((p) => (p.id === 'p2' ? { ...p, status: 'eliminated' as const } : p)) };
+    s = applyAction(s, 'p0', { type: 'play', cardId: cardId(s, 0, 'draw4') }).state;
+    expect(s.phase.kind).toBe('respondToStack');
+    const { state } = endByTime(s);
+    expect(state.phase).toMatchObject({ kind: 'roundOver', winnerId: 'p0' });
+    expect(state.players[1]?.hand).toHaveLength(4);
   });
 });

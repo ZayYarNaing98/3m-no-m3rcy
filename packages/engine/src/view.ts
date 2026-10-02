@@ -8,7 +8,7 @@ export type PublicPhase =
   | { kind: 'chooseColor' }
   | { kind: 'chooseSwapTarget' }
   | { kind: 'rouletteNameColor' }
-  | { kind: 'roundOver'; winnerId: string };
+  | { kind: 'roundOver'; winnerId: string; timeUp?: { points: Record<string, number> } };
 
 export interface PublicPlayer {
   id: string;

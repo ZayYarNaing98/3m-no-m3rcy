@@ -101,3 +101,13 @@ export function sortHand(hand: Card[]): Card[] {
   const value = (c: Card) => (c.kind.type === 'number' ? c.kind.value : 0);
   return [...hand].sort((a, b) => colorRank(a) - colorRank(b) || kindRank(a) - kindRank(b) || value(a) - value(b));
 }
+
+/** Classic UNO scoring, used to break ties when the match clock runs out: numbers at face value, actions 20, wilds 50. */
+export function cardPoints(card: Card): number {
+  if (card.color === null) return 50;
+  return card.kind.type === 'number' ? card.kind.value : 20;
+}
+
+export function handPoints(hand: Card[]): number {
+  return hand.reduce((sum, c) => sum + cardPoints(c), 0);
+}

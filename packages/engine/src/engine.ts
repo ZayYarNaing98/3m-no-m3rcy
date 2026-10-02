@@ -1,4 +1,4 @@
-import { buildDeck, drawValue, HAND_SIZE, isWild, MERCY_LIMIT, sameSymbol } from './deck';
+import { buildDeck, drawValue, HAND_SIZE, handPoints, isWild, MERCY_LIMIT, sameSymbol } from './deck';
 import { nextRandom, shuffleInPlace } from './rng';
 import {
   COLORS,
@@ -93,6 +93,27 @@ export function applyAction(state: GameState, playerId: string, action: Action):
       decide(ctx, action);
     }
   }
+  return { state: s, events };
+}
+
+/**
+ * The match clock ran out: the game ends where it stands. Among players still in, the fewest cards
+ * wins, then the fewest card points; a pending stack is dropped. A tie on both goes to the earlier seat.
+ */
+export function endByTime(state: GameState): StepResult {
+  if (state.phase.kind === 'roundOver') throw new EngineError('round_over', 'The round is over');
+  const s = cloneState(state);
+  const events: GameEvent[] = [{ type: 'timeUp' }];
+  const points: Record<string, number> = {};
+  for (const p of activePlayers(s)) points[p.id] = handPoints(p.hand);
+  const [winner] = [...activePlayers(s)].sort(
+    (a, b) => a.hand.length - b.hand.length || (points[a.id] as number) - (points[b.id] as number),
+  );
+  const w = winner as Player;
+  w.status = 'won';
+  s.carriedStack = 0;
+  s.phase = { kind: 'roundOver', winnerId: w.id, timeUp: { points } };
+  events.push({ type: 'won', playerId: w.id });
   return { state: s, events };
 }
 

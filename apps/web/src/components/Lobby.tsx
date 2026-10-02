@@ -1,4 +1,4 @@
-import { MIN_PLAYERS, TURN_SECONDS_OPTIONS } from '@nomercy/engine';
+import { MATCH_MINUTES_OPTIONS, MIN_PLAYERS, TURN_SECONDS_OPTIONS } from '@nomercy/engine';
 import { useState } from 'react';
 import { navigate } from '../App';
 import { useGame } from '../store';
@@ -104,6 +104,24 @@ export function Lobby() {
           {TURN_SECONDS_OPTIONS.map((s) => (
             <option key={s} value={s}>
               {s} seconds
+            </option>
+          ))}
+        </select>
+      </section>
+      <section className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 light:shadow-md light:ring-1 light:ring-line">
+        <label htmlFor="match" className="text-sm">
+          Match time
+        </label>
+        <select
+          id="match"
+          className="rounded-lg bg-raised-2 px-2 py-1 text-base disabled:opacity-60 sm:text-sm light:bg-surface-2 light:font-semibold"
+          disabled={!isHost}
+          value={room.settings.matchMinutes}
+          onChange={(e) => send('room:settings', { matchMinutes: Number(e.target.value) })}
+        >
+          {MATCH_MINUTES_OPTIONS.map((s) => (
+            <option key={s} value={s}>
+              {s === 0 ? 'No limit' : `${s} minutes`}
             </option>
           ))}
         </select>
