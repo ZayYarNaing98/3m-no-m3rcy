@@ -11,7 +11,7 @@ export interface ThrowTarget {
 }
 
 const MENU_W = 232;
-const MENU_H = 150;
+const MENU_H = 270;
 const GAP = 8;
 
 /** A small popover of things to throw at another player, opened by tapping their seat. */
@@ -74,7 +74,7 @@ export function ThrowMenu({ target, onCatch, onClose }: { target: ThrowTarget; o
               aria-label={`Throw ${info.label.toLowerCase()}`}
             >
               <span className="text-2xl leading-none">{info.emoji}</span>
-              <span className="mt-1 text-[0.6rem] text-slate-300">{info.label}</span>
+              <span className="mt-1 max-w-full truncate text-[0.6rem] text-slate-300">{info.label}</span>
             </button>
           );
         })}

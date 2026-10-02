@@ -414,7 +414,7 @@ export function playWild(delayMs = 0): void {
 // --- Throwables ---------------------------------------------------------------
 
 /** Something thrown across the table: a whoosh now, then the hit when it lands `landMs` later. */
-export function playThrow(item: string, landMs: number): void {
+export function playThrow(impact: 'bonk' | 'splat' | 'boom' | 'love', item: string, landMs: number): void {
   if (!soundEnabled()) return;
   const c = audio();
   if (!c || c.state !== 'running') return;
@@ -423,30 +423,32 @@ export function playThrow(item: string, landMs: number): void {
 
   if (landMs > 0) noiseBurst(c, { start: t + 0.05, length: 0.22, peak: 0.12, type: 'bandpass', from: 500, to: 2600 });
 
-  switch (item) {
-    case 'shoe':
-    case 'stone':
-    case 'hammer': {
-      // Bonk: a hard knock, pitched by how heavy the thing is.
-      const base = item === 'hammer' ? 140 : item === 'stone' ? 200 : 260;
+  switch (impact) {
+    case 'bonk': {
+      // A hard knock, pitched by how heavy the thing is.
+      const base = { hammer: 140, brick: 150, stone: 200, fish: 300, banana: 320 }[item] ?? 260;
       blip(c, { type: 'sine', from: base * 2, to: base * 0.6, start: hit, length: 0.16, peak: 0.5 });
       noiseBurst(c, { start: hit, length: 0.06, peak: 0.35, type: 'lowpass', from: 3000 });
       if (item === 'hammer') blip(c, { type: 'triangle', from: 1800, start: hit + 0.01, length: 0.25, peak: 0.08 });
       break;
     }
-    case 'tomato':
-    case 'egg':
-    case 'water':
-      // Splat: a wet, falling burst of noise.
+    case 'splat':
+      // A wet, falling burst of noise.
       noiseBurst(c, { start: hit, length: 0.2, peak: 0.4, type: 'lowpass', from: item === 'water' ? 3500 : 1800, to: 300 });
       blip(c, { type: 'sine', from: 220, to: 90, start: hit, length: 0.1, peak: 0.25 });
       if (item === 'egg') noiseBurst(c, { start: hit, length: 0.03, peak: 0.25, type: 'highpass', from: 3000 });
       break;
-    case 'bomb':
+    case 'boom':
       noiseBurst(c, { start: hit, length: 0.24, peak: 0.55, type: 'lowpass', from: 1200, to: 120 });
       blip(c, { type: 'sine', from: 120, to: 40, start: hit, length: 0.45, peak: 0.6 });
+      // A firecracker crackles after the bang.
+      if (item === 'firecracker') {
+        for (let i = 1; i <= 4; i++) {
+          noiseBurst(c, { start: hit + 0.08 * i, length: 0.03, peak: 0.3, type: 'highpass', from: 2000 });
+        }
+      }
       break;
-    case 'rose':
+    case 'love':
       blip(c, { type: 'triangle', from: 880, start: hit, length: 0.25, peak: 0.2 });
       blip(c, { type: 'triangle', from: 1320, start: hit + 0.12, length: 0.35, peak: 0.18 });
       break;

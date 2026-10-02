@@ -12,6 +12,14 @@ export const THROWABLE_INFO: Record<Throwable, { emoji: string; label: string; i
   bomb: { emoji: '💣', label: 'Bomb', impact: 'boom' },
   rose: { emoji: '🌹', label: 'Rose', impact: 'love' },
   water: { emoji: '💧', label: 'Water', impact: 'splat', splat: '💦' },
+  poop: { emoji: '💩', label: 'Poop', impact: 'splat', splat: '💩' },
+  pie: { emoji: '🥧', label: 'Pie', impact: 'splat', splat: '🥧' },
+  fish: { emoji: '🐟', label: 'Fish', impact: 'bonk' },
+  banana: { emoji: '🍌', label: 'Banana', impact: 'bonk' },
+  brick: { emoji: '🧱', label: 'Brick', impact: 'bonk' },
+  firecracker: { emoji: '🧨', label: 'Firecracker', impact: 'boom' },
+  kiss: { emoji: '💋', label: 'Kiss', impact: 'love' },
+  cake: { emoji: '🎂', label: 'Cake', impact: 'splat', splat: '🎂' },
 };
 
 /** How long a throw is in the air, in ms. */

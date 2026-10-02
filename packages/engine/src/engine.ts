@@ -152,7 +152,7 @@ function decide(ctx: Ctx, action: Action): void {
     case 'play':
       return play(ctx, action.cardId);
     case 'draw':
-      if (phase.kind === 'awaitingPlay') return drawUntilPlayable(ctx);
+      if (phase.kind === 'awaitingPlay') return drawSingle(ctx);
       if (phase.kind === 'respondToStack') return takeStack(ctx);
       throw new EngineError('bad_phase', 'You cannot draw now');
     case 'chooseColor':
@@ -304,6 +304,20 @@ function takeStack(ctx: Ctx): void {
   endTurn(ctx);
 }
 
+/**
+ * Draw tapped: one card, and the turn stays with the player. They can play any legal card or
+ * draw again; the turn only moves on when they play, hit the Mercy limit, or the deck runs dry.
+ */
+function drawSingle(ctx: Ctx): void {
+  const { s } = ctx;
+  const p = current(s);
+  const count = giveCards(ctx, p, 1);
+  checkMercy(ctx);
+  if (s.phase.kind === 'roundOver') return;
+  if (p.status !== 'active' || count === 0) endTurn(ctx);
+}
+
+/** A timed-out player draws until something is playable, then keeps it (see `timeout`). */
 function drawUntilPlayable(ctx: Ctx): void {
   const { s, events } = ctx;
   const p = current(s);

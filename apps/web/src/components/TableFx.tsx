@@ -104,7 +104,7 @@ export function TableFx() {
     const to = playerRect(thrown.targetId, playerId);
     if (!to) return;
     const from = reducedMotion() ? null : playerRect(thrown.fromId, playerId);
-    playThrow(thrown.item, from ? THROW_FLIGHT_MS : 0);
+    playThrow(THROWABLE_INFO[thrown.item].impact, thrown.item, from ? THROW_FLIGHT_MS : 0);
     setThrows((t) => [
       ...t,
       { id: nextId++, from, to, item: thrown.item, targetId: thrown.targetId, atMe: thrown.targetId === playerId },

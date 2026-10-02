@@ -112,18 +112,40 @@ describe('basic play', () => {
     expectCode(() => applyAction(s, 'p1', { type: 'draw' }), 'not_your_turn');
   });
 
-  it('draws until a playable card, then must play that card', () => {
+  it('draws one card per tap and keeps the turn until a card is played', () => {
+    let s = makeState({
+      hands: [[[G, 'number', 9], [R, 'number', 8]], [[Y, 'number', 1], [Y, 'number', 2]]],
+      top: [R, 'number', 5],
+      drawTop: [[B, 'number', 1], [R, 'number', 7]],
+    });
+    // Drawing is allowed even while holding a playable card.
+    let r = applyAction(s, 'p0', { type: 'draw' });
+    expect(r.events).toContainEqual({ type: 'drew', playerId: 'p0', count: 1 });
+    s = r.state;
+    expect(s.phase.kind).toBe('awaitingPlay');
+    expect(s.players[s.currentIndex]?.id).toBe('p0');
+    expect(s.players[0]?.hand).toHaveLength(3);
+
+    r = applyAction(s, 'p0', { type: 'draw' });
+    s = r.state;
+    expect(s.players[0]?.hand).toHaveLength(4);
+    expect(s.players[s.currentIndex]?.id).toBe('p0');
+
+    // Any legal card can be played, not only the one just drawn.
+    s = applyAction(s, 'p0', { type: 'play', cardId: cardId(s, 0, 'number', R, 8) }).state;
+    expect(s.players[s.currentIndex]?.id).toBe('p1');
+  });
+
+  it('a timed-out player still draws until playable and keeps the card', () => {
     const s = makeState({
       hands: [[[G, 'number', 9], [G, 'number', 8]], [[Y, 'number', 1], [Y, 'number', 2]]],
       top: [R, 'number', 5],
       drawTop: [[B, 'number', 1], [Y, 'number', 2], [R, 'number', 7]],
     });
-    const { state, events } = applyAction(s, 'p0', { type: 'draw' });
+    const { state, events } = applyAction(s, 'p0', { type: 'timeout' });
     expect(events).toContainEqual({ type: 'drew', playerId: 'p0', count: 3 });
-    expect(state.phase.kind).toBe('drawingUntilPlayable');
-    expectCode(() => applyAction(state, 'p0', { type: 'play', cardId: cardId(state, 0, 'number', B, 1) }), 'illegal_card');
-    const after = applyAction(state, 'p0', { type: 'play', cardId: cardId(state, 0, 'number', R, 7) });
-    expect(after.state.phase.kind).toBe('chooseSwapTarget');
+    expect(state.players[0]?.hand).toHaveLength(5);
+    expect(state.players[state.currentIndex]?.id).toBe('p1');
   });
 
   it('wins when the last card is played', () => {
