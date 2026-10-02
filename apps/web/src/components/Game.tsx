@@ -1,4 +1,4 @@
-import { COLORS, MERCY_LIMIT, REACTIONS, sortHand, type Color, type EndOutcome, type EndVote, type PlayerView, type PublicPlayer } from '@nomercy/engine';
+import { COLORS, END_VOTE_MS, MERCY_LIMIT, REACTIONS, sortHand, type Color, type EndOutcome, type EndVote, type PlayerView, type PublicPlayer } from '@nomercy/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { navigate } from '../App';
 import { setSoundEnabled, soundEnabled } from '../sound';
@@ -351,14 +351,15 @@ function EndSheet({
   return (
     <Sheet
       title="End this game?"
-      subtitle={`This starts a vote: ${needed} of the ${voters} players still in need to agree within 30 seconds. Your vote counts as yes.`}
+      subtitle={`Starts a vote: ${needed} of ${voters} players need to agree within 30s. Your vote counts as yes.`}
+      peek
     >
       <div className="flex flex-col gap-2">
-        <button className="btn-primary text-left" onClick={() => onPick('finish')}>
+        <button className="btn-primary py-2.5 text-left sm:py-3" onClick={() => onPick('finish')}>
           🏁 Finish now
           <span className="block text-xs font-normal opacity-90">Fewest cards wins, then fewest card points</span>
         </button>
-        <button className="btn-secondary text-left" onClick={() => onPick('cancel')}>
+        <button className="btn-secondary py-2.5 text-left sm:py-3" onClick={() => onPick('cancel')}>
           ✖ Cancel game
           <span className="block text-xs font-normal text-slate-400">No winner, everyone goes back to the lobby</span>
         </button>
@@ -386,31 +387,72 @@ function VoteBanner({ vote, game }: { vote: EndVote; game: PlayerView }) {
   const mine = playerId && vote.yesIds.includes(playerId) ? '✅' : playerId && vote.noIds.includes(playerId) ? '❌' : null;
 
   return (
-    <div className="fixed inset-x-0 top-14 z-30 flex justify-center px-3">
+    <div className="pointer-events-none fixed inset-x-0 top-[max(env(safe-area-inset-top),0px)] z-30 flex justify-center px-3 pt-12 sm:pt-14">
       <div
         role="status"
-        className="w-full max-w-sm rounded-2xl bg-slate-900/95 p-3 text-sm shadow-2xl ring-1 ring-amber-300/60"
+        className="pointer-events-auto relative w-full max-w-sm overflow-hidden rounded-2xl bg-slate-900 shadow-[0_12px_40px_rgba(0,0,0,0.6)] ring-1 ring-amber-400/50"
       >
-        <p className="font-bold">
-          {vote.outcome === 'finish' ? '🏁' : '✖'} {name(vote.byId)} {vote.byId === playerId ? 'want' : 'wants'} to{' '}
-          {vote.outcome === 'finish' ? 'end the game' : 'cancel the game'}
-        </p>
-        <p className="mt-0.5 text-xs text-slate-400">
-          {vote.outcome === 'finish' ? 'Fewest cards wins.' : 'No winner, back to the lobby.'} {vote.yesIds.length}/{needed}{' '}
-          needed · <span className="tabular-nums">{left}s</span>
-        </p>
-        {canVote ? (
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <button className="rounded-xl bg-emerald-600 py-1.5 font-bold text-white hover:bg-emerald-500" onClick={() => send('game:vote', { agree: true })}>
-              ✅ Agree
-            </button>
-            <button className="rounded-xl bg-white/10 py-1.5 font-bold hover:bg-white/20" onClick={() => send('game:vote', { agree: false })}>
-              ❌ Keep playing
-            </button>
+        <div className="p-3">
+          <div className="flex items-start gap-2.5">
+            <span className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-amber-400/15 text-base">
+              {vote.outcome === 'finish' ? '🏁' : '✖'}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm leading-tight font-bold">
+                {name(vote.byId)} {vote.byId === playerId ? 'want' : 'wants'} to {vote.outcome === 'finish' ? 'end' : 'cancel'} the game
+              </p>
+              <p className="mt-0.5 truncate text-xs text-slate-400">
+                {vote.outcome === 'finish' ? 'Fewest cards wins' : 'No winner · back to the lobby'}
+              </p>
+            </div>
+            <span
+              className={`flex-none rounded-full px-2 py-0.5 text-xs font-bold tabular-nums ${
+                left <= 10 ? 'bg-red-600/25 text-red-200' : 'bg-white/10 text-slate-200'
+              }`}
+            >
+              {left}s
+            </span>
           </div>
-        ) : (
-          mine && <p className="mt-1 text-xs text-slate-300">You voted {mine}</p>
-        )}
+
+          <div className="mt-2.5 flex items-center gap-2 text-xs text-slate-300">
+            <span className="flex gap-1" aria-hidden="true">
+              {Array.from({ length: needed }, (_, i) => (
+                <span
+                  key={i}
+                  className={`h-2 w-2 rounded-full ${i < vote.yesIds.length ? 'bg-emerald-400' : 'bg-white/20'}`}
+                />
+              ))}
+            </span>
+            <span>
+              {Math.min(vote.yesIds.length, needed)} of {needed} votes needed
+            </span>
+            {mine && !canVote && <span className="ml-auto text-slate-400">You voted {mine}</span>}
+          </div>
+
+          {canVote && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                className="h-10 rounded-xl bg-emerald-600 text-sm font-bold text-white transition hover:bg-emerald-500 active:scale-[0.97]"
+                onClick={() => send('game:vote', { agree: true })}
+              >
+                Agree
+              </button>
+              <button
+                className="h-10 rounded-xl bg-white/10 text-sm font-bold transition hover:bg-white/20 active:scale-[0.97]"
+                onClick={() => send('game:vote', { agree: false })}
+              >
+                Keep playing
+              </button>
+            </div>
+          )}
+        </div>
+        {/* Time left in the vote. */}
+        <div className="h-1 bg-white/10">
+          <div
+            className={`h-full transition-[width] duration-1000 ease-linear ${left <= 10 ? 'bg-red-500' : 'bg-amber-400'}`}
+            style={{ width: `${Math.min(100, (left * 1000 * 100) / END_VOTE_MS)}%` }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -422,6 +464,7 @@ function LeaveSheet({ forfeits, onCancel }: { forfeits: boolean; onCancel: () =>
     <Sheet
       title="Leave the game?"
       subtitle={forfeits ? 'You forfeit this round and your cards go back into the deck.' : 'You give up your seat in this room.'}
+      peek
     >
       <div className="flex flex-col gap-2">
         <button
