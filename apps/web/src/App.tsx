@@ -60,7 +60,7 @@ function RoomScreen({ code }: { code: string }) {
   if (!room || !ready) {
     return (
       <Centered>
-        <p className="animate-pulse text-slate-400">{conn === 'connecting' ? 'Connecting…' : 'Loading room…'}</p>
+        <p className="animate-pulse text-muted">{conn === 'connecting' ? 'Connecting…' : 'Loading room…'}</p>
       </Centered>
     );
   }
@@ -71,13 +71,13 @@ function RoomScreen({ code }: { code: string }) {
         <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-4 p-6 text-center">
           <HeroBanner />
           <p className="mt-2 text-lg font-semibold">This game has already started.</p>
-          <p className="text-sm text-slate-400">
-            Room <span className="font-mono text-slate-100">{room.code}</span> · {room.players.length} players
+          <p className="text-sm text-muted">
+            Room <span className="font-mono text-fg">{room.code}</span> · {room.players.length} players
           </p>
           <button className="btn-primary" onClick={() => setWatching(true)} disabled={!game}>
             👀 Watch this game
           </button>
-          <p className="text-xs text-slate-500">Spectators see the table live, but never anyone's cards.</p>
+          <p className="text-xs text-subtle">Spectators see the table live, but never anyone's cards.</p>
           <button className="btn-secondary" onClick={() => navigate('/')}>
             Back home
           </button>
@@ -102,7 +102,7 @@ function Toast() {
   if (!message) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
-      <div className="rounded-full bg-slate-800/95 px-4 py-2 text-sm shadow-lg ring-1 ring-white/10">{message}</div>
+      <div className="rounded-full bg-raised-2/95 px-4 py-2 text-sm shadow-lg ring-1 ring-line">{message}</div>
     </div>
   );
 }

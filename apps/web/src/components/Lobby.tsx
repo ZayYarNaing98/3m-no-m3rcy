@@ -5,6 +5,7 @@ import { useGame } from '../store';
 import { Avatar } from './Avatar';
 import { ChatButton, ChatPanel } from './Chat';
 import { TableFx } from './TableFx';
+import { ThemeToggle } from './ThemeToggle';
 import { seatRectOf, ThrowMenu, type ThrowTarget } from './ThrowMenu';
 
 export function Lobby() {
@@ -31,20 +32,23 @@ export function Lobby() {
 
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col gap-6 p-6">
+      <div className="-mb-4 flex justify-end">
+        <ThemeToggle />
+      </div>
       <header className="text-center">
-        <p className="text-sm text-slate-400">Room code</p>
+        <p className="text-sm text-muted">Room code</p>
         <p className="font-mono text-5xl font-black tracking-[0.2em]">{room.code}</p>
-        <button className="mt-3 text-sm text-sky-400 underline-offset-4 hover:underline" onClick={copy}>
+        <button className="mt-3 text-sm text-sky-400 light:text-sky-700 underline-offset-4 hover:underline" onClick={copy}>
           {copied ? 'Link copied!' : 'Copy invite link'}
         </button>
       </header>
 
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-400">Players · {room.players.length}/10</h2>
+          <h2 className="text-sm font-semibold text-muted">Players · {room.players.length}/10</h2>
           <ChatButton />
         </div>
-        <ul className="divide-y divide-white/5 rounded-2xl bg-white/5">
+        <ul className="divide-y divide-line-soft rounded-2xl bg-surface">
           {room.players.map((p) => (
             <li key={p.id} className="flex items-center gap-3 px-4 py-3">
               {p.id === playerId ? (
@@ -64,17 +68,17 @@ export function Lobby() {
               )}
               <span className="flex-1 truncate">
                 {p.name}
-                {p.id === playerId && <span className="text-slate-500"> (you)</span>}
+                {p.id === playerId && <span className="text-subtle"> (you)</span>}
               </span>
               {p.id === room.hostId ? (
-                <span className="rounded-full bg-amber-400/20 px-2 text-xs text-amber-300">host</span>
+                <span className="rounded-full bg-amber-400/20 px-2 text-xs text-amber-300 light:text-amber-700">host</span>
               ) : p.ready ? (
-                <span className="rounded-full bg-emerald-400/20 px-2 text-xs text-emerald-300">ready</span>
+                <span className="rounded-full bg-emerald-400/20 px-2 text-xs text-emerald-300 light:text-emerald-700">ready</span>
               ) : (
-                <span className="rounded-full bg-white/10 px-2 text-xs text-slate-400">not ready</span>
+                <span className="rounded-full bg-surface-2 px-2 text-xs text-muted">not ready</span>
               )}
               {isHost && p.id !== playerId && (
-                <button className="text-xs text-red-400 hover:underline" onClick={() => send('room:kick', { playerId: p.id })}>
+                <button className="text-xs text-red-400 light:text-red-600 hover:underline" onClick={() => send('room:kick', { playerId: p.id })}>
                   Kick
                 </button>
               )}
@@ -82,17 +86,17 @@ export function Lobby() {
           ))}
         </ul>
         {room.players.length > 1 && (
-          <p className="mt-2 text-center text-xs text-slate-500">Tap someone's avatar to throw something at them 👟🍅</p>
+          <p className="mt-2 text-center text-xs text-subtle">Tap someone's avatar to throw something at them 👟🍅</p>
         )}
       </section>
 
-      <section className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
+      <section className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">
         <label htmlFor="turn" className="text-sm">
           Turn timer
         </label>
         <select
           id="turn"
-          className="rounded-lg bg-slate-800 px-2 py-1 text-base disabled:opacity-60 sm:text-sm"
+          className="rounded-lg bg-raised-2 px-2 py-1 text-base disabled:opacity-60 sm:text-sm"
           disabled={!isHost}
           value={room.settings.turnSeconds}
           onChange={(e) => send('room:settings', { turnSeconds: Number(e.target.value) })}
@@ -120,7 +124,7 @@ export function Lobby() {
           </button>
         ) : (
           <>
-            <p className="text-center text-sm text-slate-400">
+            <p className="text-center text-sm text-muted">
               {me?.ready ? 'Waiting for the host to start…' : 'Ready up so the host can start.'}
             </p>
             <button

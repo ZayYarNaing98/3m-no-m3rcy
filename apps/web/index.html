@@ -7,8 +7,17 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <title>UNO No Mercy</title>
+    <script>
+      // Set the saved theme before the first paint so light-mode users don't see a dark flash.
+      try {
+        var t = localStorage.getItem('nomercy:theme');
+        if (t === 'light' || (t !== 'dark' && matchMedia('(prefers-color-scheme: light)').matches)) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      } catch (e) {}
+    </script>
   </head>
-  <body class="bg-slate-950">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

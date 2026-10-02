@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { navigate } from '../App';
 import { HeroBanner } from './HeroBanner';
+import { ThemeToggle } from './ThemeToggle';
 
 export function Home() {
   const [code, setCode] = useState('');
@@ -34,9 +35,12 @@ export function Home() {
 
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-6 p-6">
+      <div className="flex justify-end">
+        <ThemeToggle />
+      </div>
       <header className="text-center">
         <HeroBanner />
-        <p className="mt-4 text-slate-400">168 cards. Stack everything. 25 cards and you're out.</p>
+        <p className="mt-4 text-muted">168 cards. Stack everything. 25 cards and you're out.</p>
       </header>
 
       <button className="btn-primary" onClick={create} disabled={busy}>
@@ -45,10 +49,10 @@ export function Home() {
 
       <form
         onSubmit={join}
-        className="flex w-full items-center rounded-2xl bg-white/10 p-1 ring-sky-400 focus-within:ring-2"
+        className="flex w-full items-center rounded-2xl bg-surface-2 p-1 ring-sky-400 focus-within:ring-2"
       >
         <input
-          className="min-w-0 flex-1 bg-transparent px-4 py-2 font-mono tracking-[0.3em] uppercase outline-none placeholder:text-slate-500"
+          className="min-w-0 flex-1 bg-transparent px-4 py-2 font-mono tracking-[0.3em] uppercase outline-none placeholder:text-subtle"
           placeholder="ROOM CODE"
           maxLength={6}
           value={code}
@@ -56,14 +60,14 @@ export function Home() {
           aria-label="Room code"
         />
         <button
-          className="rounded-xl bg-white/15 px-5 py-2 font-semibold transition hover:bg-white/25 active:scale-[0.98]"
+          className="rounded-xl bg-surface-3 px-5 py-2 font-semibold transition hover:bg-surface-3 active:scale-[0.98]"
           type="submit"
         >
           Join
         </button>
       </form>
 
-      {error && <p className="text-center text-sm text-red-400">{error}</p>}
+      {error && <p className="text-center text-sm text-red-400 light:text-red-600">{error}</p>}
     </div>
   );
 }

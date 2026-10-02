@@ -1,5 +1,60 @@
 @import 'tailwindcss';
 
+/*
+ * Colour tokens. Dark is the default and what the game table always uses; the screens around a
+ * game (home, join, lobby) switch to light with data-theme="light" on <html> (see theme.ts).
+ */
+:root {
+  color-scheme: dark;
+  --page-top: #1e293b;
+  --page: #020617;
+  --fg: #f1f5f9;
+  --muted: #94a3b8;
+  --subtle: #64748b;
+  --surface: rgb(255 255 255 / 0.05);
+  --surface-2: rgb(255 255 255 / 0.1);
+  --surface-3: rgb(255 255 255 / 0.2);
+  --raised: #0f172a;
+  --raised-2: #1e293b;
+  --line: rgb(255 255 255 / 0.1);
+  --line-soft: rgb(255 255 255 / 0.05);
+  --line-strong: rgb(255 255 255 / 0.4);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --page-top: #ffffff;
+  --page: #e8edf4;
+  --fg: #0f172a;
+  --muted: #475569;
+  --subtle: #64748b;
+  --surface: rgb(255 255 255 / 0.85);
+  --surface-2: rgb(15 23 42 / 0.07);
+  --surface-3: rgb(15 23 42 / 0.14);
+  --raised: #ffffff;
+  --raised-2: #ffffff;
+  --line: rgb(15 23 42 / 0.12);
+  --line-soft: rgb(15 23 42 / 0.07);
+  --line-strong: rgb(15 23 42 / 0.3);
+}
+
+@theme inline {
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-raised: var(--raised);
+  --color-raised-2: var(--raised-2);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
+}
+
+/* For the few accent colours that need a darker shade on a light background. */
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
+
 html,
 body,
 #root {
@@ -8,26 +63,26 @@ body,
 
 body {
   font-family: ui-rounded, 'SF Pro Rounded', system-ui, sans-serif;
-  color: #f1f5f9;
+  color: var(--fg);
   /* Painted once over the first screen; long pages (a full lobby) continue in the gradient's end colour
      instead of repeating it, which showed as a light band partway down. */
-  background: #020617 radial-gradient(ellipse at top, #1e293b 0%, #020617 70%) no-repeat;
+  background: var(--page) radial-gradient(ellipse at top, var(--page-top) 0%, var(--page) 70%) no-repeat;
   background-size: 100% 100vh;
   -webkit-tap-highlight-color: transparent;
 }
 
 @layer components {
   .btn-primary {
-    @apply rounded-2xl bg-gradient-to-r from-red-600 to-orange-500 px-5 py-3 font-bold shadow-lg shadow-red-900/40 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply rounded-2xl bg-gradient-to-r from-red-600 to-orange-500 px-5 py-3 font-bold text-white shadow-lg shadow-red-900/40 transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-secondary {
-    @apply rounded-2xl bg-white/10 px-5 py-3 font-semibold transition hover:bg-white/15 active:scale-[0.98] disabled:opacity-50;
+    @apply rounded-2xl bg-surface-2 px-5 py-3 font-semibold transition hover:bg-surface-3 active:scale-[0.98] disabled:opacity-50;
   }
   .btn-danger {
-    @apply rounded-2xl bg-red-600 px-5 py-3 font-black transition hover:bg-red-500 active:scale-[0.98];
+    @apply rounded-2xl bg-red-600 px-5 py-3 font-black text-white transition hover:bg-red-500 active:scale-[0.98];
   }
   .input {
-    @apply rounded-2xl bg-white/10 px-4 py-3 outline-none ring-sky-400 placeholder:text-slate-500 focus:ring-2;
+    @apply rounded-2xl bg-surface-2 px-4 py-3 outline-none ring-sky-400 placeholder:text-subtle focus:ring-2;
   }
 }
 

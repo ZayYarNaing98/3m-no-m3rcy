@@ -11,7 +11,7 @@ export function ChatButton() {
   return (
     <button
       className={`relative flex h-7 w-7 items-center justify-center rounded-full text-base transition ${
-        open ? 'bg-white/25 ring-1 ring-white/40' : 'bg-white/10 hover:bg-white/20'
+        open ? 'bg-surface-3 ring-1 ring-line-strong' : 'bg-surface-2 hover:bg-surface-3'
       }`}
       onClick={() => setOpen(!open)}
       aria-expanded={open}
@@ -20,7 +20,7 @@ export function ChatButton() {
     >
       💬
       {unread > 0 && !open && (
-        <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[0.6rem] font-black text-white ring-2 ring-slate-900">
+        <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[0.6rem] font-black text-white ring-2 ring-raised">
           {unread > 9 ? '9+' : unread}
         </span>
       )}
@@ -133,13 +133,13 @@ export function ChatPanel() {
     <aside
       role="dialog"
       aria-label="Chat"
-      className="fixed inset-x-0 bottom-0 z-40 flex h-[70vh] flex-col rounded-t-3xl bg-slate-900 shadow-2xl ring-1 ring-white/10 sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-full sm:w-80 sm:rounded-none sm:rounded-l-3xl"
+      className="fixed inset-x-0 bottom-0 z-40 flex h-[70vh] flex-col rounded-t-3xl bg-raised shadow-2xl ring-1 ring-line sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:h-full sm:w-80 sm:rounded-none sm:rounded-l-3xl"
       style={box ? { top: box.top, height: box.height, bottom: 'auto' } : undefined}
     >
-      <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+      <header className="flex items-center justify-between border-b border-line px-4 py-3">
         <h2 className="font-bold">💬 Chat</h2>
         <button
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 hover:bg-white/20"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 hover:bg-surface-3"
           onClick={() => setChatOpen(false)}
           aria-label="Close chat"
         >
@@ -148,14 +148,14 @@ export function ChatPanel() {
       </header>
 
       <div ref={list} className="flex-1 space-y-3 overflow-y-auto px-4 py-3" aria-live="polite">
-        {chat.length === 0 && <p className="pt-8 text-center text-sm text-slate-500">No messages yet. Say hi 👋</p>}
+        {chat.length === 0 && <p className="pt-8 text-center text-sm text-subtle">No messages yet. Say hi 👋</p>}
         {chat.map((m) => {
           const mine = m.playerId === playerId;
           return (
             <div key={m.id} className={`flex gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
               <Avatar name={m.name} size="xs" />
               <div className={`max-w-[80%] ${mine ? 'text-right' : ''}`}>
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-muted">
                   {mine ? 'You' : m.name} · {time(m.at)}
                 </div>
                 {isBigEmoji(m.text) ? (
@@ -163,7 +163,7 @@ export function ChatPanel() {
                 ) : (
                   <p
                     className={`mt-0.5 inline-block rounded-2xl px-3 py-1.5 text-left text-sm break-words whitespace-pre-wrap ${
-                      mine ? 'rounded-tr-sm bg-sky-600 text-white' : 'rounded-tl-sm bg-white/10 text-slate-100'
+                      mine ? 'rounded-tr-sm bg-sky-600 text-white' : 'rounded-tl-sm bg-surface-2 text-fg'
                     }`}
                   >
                     {m.text}
@@ -176,12 +176,12 @@ export function ChatPanel() {
       </div>
 
       {emojiOpen && playerId && (
-        <div role="group" aria-label="Insert emoji" className="grid grid-cols-8 gap-1 border-t border-white/10 px-3 pt-2">
+        <div role="group" aria-label="Insert emoji" className="grid grid-cols-8 gap-1 border-t border-line px-3 pt-2">
           {CHAT_EMOJI.map((emoji) => (
             <button
               key={emoji}
               type="button"
-              className="flex h-9 items-center justify-center rounded-lg text-2xl leading-none transition hover:bg-white/10 active:scale-90"
+              className="flex h-9 items-center justify-center rounded-lg text-2xl leading-none transition hover:bg-surface-2 active:scale-90"
               // Keep the text box focused (and the phone keyboard open) while tapping emoji.
               onPointerDown={(e) => e.preventDefault()}
               onClick={() => insertEmoji(emoji)}
@@ -193,11 +193,11 @@ export function ChatPanel() {
         </div>
       )}
 
-      <form onSubmit={submit} className="flex items-center gap-2 border-t border-white/10 p-3">
+      <form onSubmit={submit} className="flex items-center gap-2 border-t border-line p-3">
         <button
           type="button"
           className={`flex h-10 w-10 flex-none items-center justify-center rounded-full text-xl transition ${
-            emojiOpen ? 'bg-white/25 ring-1 ring-white/40' : 'bg-white/10 hover:bg-white/20'
+            emojiOpen ? 'bg-surface-3 ring-1 ring-line-strong' : 'bg-surface-2 hover:bg-surface-3'
           }`}
           onPointerDown={(e) => e.preventDefault()}
           onClick={() => setEmojiOpen((o) => !o)}

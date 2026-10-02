@@ -31,8 +31,8 @@ export function JoinForm({ room }: { room: RoomView }) {
   return (
     <form onSubmit={submit} className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-4 p-6">
       <HeroBanner />
-      <p className="mt-2 text-center text-slate-400">
-        Room <span className="font-mono text-slate-100">{room.code}</span> · {room.players.length}/10 players
+      <p className="mt-2 text-center text-muted">
+        Room <span className="font-mono text-fg">{room.code}</span> · {room.players.length}/10 players
       </p>
       <input
         className="input text-center"
