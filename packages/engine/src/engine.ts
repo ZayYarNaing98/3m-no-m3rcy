@@ -27,7 +27,10 @@ export function createGame(seats: SeatInput[], seed: number): GameState {
   const drawPile = buildDeck();
   let rngState = shuffleInPlace(drawPile, seed);
 
-  const players: Player[] = seats.map((s) => ({
+  // Seats are shuffled so every game starts from a different table order.
+  const order = [...seats];
+  rngState = shuffleInPlace(order, rngState);
+  const players: Player[] = order.map((s) => ({
     id: s.id,
     name: s.name,
     hand: [],

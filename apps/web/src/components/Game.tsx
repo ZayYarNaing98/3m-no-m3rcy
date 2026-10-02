@@ -1,4 +1,4 @@
-import { COLORS, MERCY_LIMIT, REACTIONS, type Color, type PlayerView, type PublicPlayer } from '@nomercy/engine';
+import { COLORS, MERCY_LIMIT, REACTIONS, sortHand, type Color, type PlayerView, type PublicPlayer } from '@nomercy/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { navigate } from '../App';
 import { setSoundEnabled, soundEnabled } from '../sound';
@@ -770,11 +770,12 @@ function MyHand({
   const stacked = myTurn && phase.kind === 'respondToStack';
   const drawn = phase.kind === 'drawingUntilPlayable' ? phase.drawnCardId : undefined;
   const canUno = game.hand.length <= 2 && !me.calledUno;
+  const hand = sortHand(game.hand);
 
   // Cards that weren't in the hand last render get a deal-in animation.
   const seen = useRef<Set<string> | null>(null);
   const previous = seen.current;
-  const fresh = previous ? game.hand.filter((c) => !previous.has(c.id)).map((c) => c.id) : [];
+  const fresh = previous ? hand.filter((c) => !previous.has(c.id)).map((c) => c.id) : [];
   useEffect(() => {
     seen.current = new Set(game.hand.map((c) => c.id));
   });
@@ -804,7 +805,7 @@ function MyHand({
         {/* Wrap onto more rows instead of scrolling; row gap leaves room for raised cards.
             Big hands on phones overlap like a fan so more fit per row. */}
         <div className={`flex flex-wrap justify-center gap-y-3 ${fanned ? 'pl-4' : 'gap-x-1.5'}`}>
-          {game.hand.map((c) => {
+          {hand.map((c) => {
             const dealIndex = fresh.indexOf(c.id);
             return (
               <span

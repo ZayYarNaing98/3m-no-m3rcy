@@ -7,6 +7,7 @@ import {
   EngineError,
   legalCardIds,
   playerView,
+  sortHand,
   type GameState,
 } from '../src';
 import { cardId, makeState, totalCards } from './helpers';
@@ -47,7 +48,37 @@ describe('deck', () => {
   });
 });
 
+describe('sortHand', () => {
+  it('puts wild cards first, then groups each colour with numbers before actions', () => {
+    const { players } = makeState({
+      hands: [
+        [[B, 'reverse'], [null, 'wildDraw6'], [R, 'draw2'], [Y, 'draw2'], [Y, 'skip'], [R, 'number', 7], [R, 'draw4'], [R, 'number', 2]],
+      ],
+      top: [G, 'number', 5],
+    });
+    const label = (c: { color: string | null; kind: { type: string; value?: number } }) =>
+      `${c.color ?? 'wild'} ${c.kind.type}${c.kind.value !== undefined ? ` ${c.kind.value}` : ''}`;
+    expect(sortHand(players[0]!.hand).map(label)).toEqual([
+      'wild wildDraw6',
+      'red number 2',
+      'red number 7',
+      'red draw2',
+      'red draw4',
+      'yellow skip',
+      'yellow draw2',
+      'blue reverse',
+    ]);
+  });
+});
+
 describe('createGame', () => {
+  it('seats players in a shuffled order that varies by seed', () => {
+    const seats = [0, 1, 2, 3, 4, 5].map((i) => ({ id: `p${i}`, name: `P${i}` }));
+    const orders = new Set([1, 2, 3, 4, 5].map((seed) => createGame(seats, seed).players.map((p) => p.id).join()));
+    expect(orders.size).toBeGreaterThan(1);
+    for (const o of orders) expect(o.split(',').sort()).toEqual(seats.map((s) => s.id));
+  });
+
   it('deals 7 each, starts on a number card, and is deterministic by seed', () => {
     const seats = [0, 1, 2, 3].map((i) => ({ id: `p${i}`, name: `P${i}` }));
     const a = createGame(seats, 123);

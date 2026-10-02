@@ -1,4 +1,4 @@
-import { COLORS, type Card, type CardKind, type NumberValue } from './types';
+import { COLORS, type Card, type CardKind, type CardType, type NumberValue } from './types';
 
 export const DECK_SIZE = 168;
 export const MERCY_LIMIT = 25;
@@ -78,4 +78,26 @@ export function cardLabel(card: Card): string {
     default:
       return `${color} ${k.type}`;
   }
+}
+
+const KIND_ORDER: CardType[] = [
+  'wildColorRoulette',
+  'wildReverseDraw4',
+  'wildDraw6',
+  'wildDraw10',
+  'number',
+  'skip',
+  'reverse',
+  'draw2',
+  'draw4',
+  'discardAll',
+  'skipEveryone',
+];
+
+/** A hand in display order: wild cards first, then each colour grouped, numbers before actions. */
+export function sortHand(hand: Card[]): Card[] {
+  const colorRank = (c: Card) => (c.color === null ? -1 : COLORS.indexOf(c.color));
+  const kindRank = (c: Card) => KIND_ORDER.indexOf(c.kind.type);
+  const value = (c: Card) => (c.kind.type === 'number' ? c.kind.value : 0);
+  return [...hand].sort((a, b) => colorRank(a) - colorRank(b) || kindRank(a) - kindRank(b) || value(a) - value(b));
 }
