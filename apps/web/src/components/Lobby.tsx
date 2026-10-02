@@ -48,7 +48,7 @@ export function Lobby() {
           <h2 className="text-sm font-semibold text-muted">Players · {room.players.length}/10</h2>
           <ChatButton />
         </div>
-        <ul className="divide-y divide-line-soft rounded-2xl bg-surface">
+        <ul className="divide-y divide-line-soft rounded-2xl bg-surface light:shadow-md light:ring-1 light:ring-line">
           {room.players.map((p) => (
             <li key={p.id} className="flex items-center gap-3 px-4 py-3">
               {p.id === playerId ? (
@@ -90,13 +90,13 @@ export function Lobby() {
         )}
       </section>
 
-      <section className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3">
+      <section className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 light:shadow-md light:ring-1 light:ring-line">
         <label htmlFor="turn" className="text-sm">
           Turn timer
         </label>
         <select
           id="turn"
-          className="rounded-lg bg-raised-2 px-2 py-1 text-base disabled:opacity-60 sm:text-sm"
+          className="rounded-lg bg-raised-2 px-2 py-1 text-base disabled:opacity-60 sm:text-sm light:bg-surface-2 light:font-semibold"
           disabled={!isHost}
           value={room.settings.turnSeconds}
           onChange={(e) => send('room:settings', { turnSeconds: Number(e.target.value) })}

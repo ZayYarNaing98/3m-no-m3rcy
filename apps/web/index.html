@@ -10,10 +10,7 @@
     <script>
       // Set the saved theme before the first paint so light-mode users don't see a dark flash.
       try {
-        var t = localStorage.getItem('nomercy:theme');
-        if (t === 'light' || (t !== 'dark' && matchMedia('(prefers-color-scheme: light)').matches)) {
-          document.documentElement.dataset.theme = 'light';
-        }
+        if (localStorage.getItem('nomercy:theme') === 'light') document.documentElement.dataset.theme = 'light';
       } catch (e) {}
     </script>
   </head>

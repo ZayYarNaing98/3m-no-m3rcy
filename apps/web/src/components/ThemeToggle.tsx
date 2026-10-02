@@ -1,12 +1,11 @@
 import { setThemePref, useThemePref, type ThemePref } from '../theme';
 
 const OPTIONS: { value: ThemePref; icon: string; label: string }[] = [
-  { value: 'auto', icon: '🌓', label: 'Auto' },
   { value: 'light', icon: '☀️', label: 'Light' },
   { value: 'dark', icon: '🌙', label: 'Dark' },
 ];
 
-/** Auto / Light / Dark switch for the screens outside a game. */
+/** Light / Dark switch for the screens outside a game. */
 export function ThemeToggle() {
   const pref = useThemePref();
   return (

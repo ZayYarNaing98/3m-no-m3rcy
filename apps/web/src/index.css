@@ -23,18 +23,18 @@
 
 :root[data-theme='light'] {
   color-scheme: light;
-  --page-top: #ffffff;
-  --page: #e8edf4;
+  --page-top: #f1f5f9;
+  --page: #d5dde8;
   --fg: #0f172a;
-  --muted: #475569;
-  --subtle: #64748b;
-  --surface: rgb(255 255 255 / 0.85);
-  --surface-2: rgb(15 23 42 / 0.07);
-  --surface-3: rgb(15 23 42 / 0.14);
+  --muted: #334155;
+  --subtle: #475569;
+  --surface: #ffffff;
+  --surface-2: rgb(15 23 42 / 0.08);
+  --surface-3: rgb(15 23 42 / 0.16);
   --raised: #ffffff;
   --raised-2: #ffffff;
-  --line: rgb(15 23 42 / 0.12);
-  --line-soft: rgb(15 23 42 / 0.07);
+  --line: rgb(15 23 42 / 0.16);
+  --line-soft: rgb(15 23 42 / 0.1);
   --line-strong: rgb(15 23 42 / 0.3);
 }
 
