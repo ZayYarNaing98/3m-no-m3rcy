@@ -104,7 +104,7 @@ export function legalCardIds(state: GameState, playerId: string): string[] {
       return [state.phase.drawnCardId];
     case 'respondToStack': {
       const min = state.phase.minValue;
-      return p.hand.filter((c) => drawValue(c) >= min).map((c) => c.id);
+      return p.hand.filter((c) => canStack(state, c, min)).map((c) => c.id);
     }
     default:
       return [];
@@ -181,8 +181,11 @@ function play(ctx: Ctx, cardId: string): void {
   } else if (phase.kind === 'drawingUntilPlayable') {
     if (card.id !== phase.drawnCardId) throw new EngineError('illegal_card', 'You must play the card you drew');
   } else if (phase.kind === 'respondToStack') {
-    if (drawValue(card) < phase.minValue) {
-      throw new EngineError('illegal_card', `Stack a draw card of +${phase.minValue} or more, or take the stack`);
+    if (!canStack(s, card, phase.minValue)) {
+      throw new EngineError(
+        'illegal_card',
+        `Stack a ${s.activeColor} or wild draw card of +${phase.minValue} or more, or take the stack`,
+      );
     }
     carried = phase.pending;
   } else {
@@ -452,6 +455,14 @@ function canPlayNormally(s: GameState, card: Card): boolean {
   if (isWild(card)) return true;
   if (card.color === s.activeColor) return true;
   return sameSymbol(card, topCard(s));
+}
+
+/**
+ * A draw card can go on a stack when it is worth at least the minimum and, like any play,
+ * it is wild, matches the colour in play, or is the same card as the top one (blue +4 on red +4).
+ */
+function canStack(s: GameState, card: Card, minValue: number): boolean {
+  return drawValue(card) >= minValue && canPlayNormally(s, card);
 }
 
 function endTurn(ctx: Ctx, skip = 0): void {

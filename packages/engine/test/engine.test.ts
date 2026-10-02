@@ -165,7 +165,7 @@ describe('stacking', () => {
     let s: GameState = makeState({
       hands: [
         [[R, 'draw2'], [R, 'number', 1]],
-        [[B, 'draw4'], [B, 'number', 1]],
+        [[R, 'draw4'], [B, 'number', 1]],
         [[null, 'wildDraw6'], [G, 'number', 1]],
         [[Y, 'number', 9], [Y, 'number', 8]],
       ],
@@ -188,6 +188,40 @@ describe('stacking', () => {
     expect(r.state.players[3]?.hand).toHaveLength(14);
     expect(r.state.currentIndex).toBe(0);
     expect(r.state.phase.kind).toBe('awaitingPlay');
+  });
+
+  it('only stacks coloured draw cards in the colour in play or on the same card', () => {
+    // Two players: the Wild Reverse +4 still passes the stack to p1.
+    let s: GameState = makeState({
+      hands: [
+        [[null, 'wildReverseDraw4'], [R, 'number', 1]],
+        [[R, 'draw4'], [Y, 'draw4'], [null, 'wildDraw6'], [B, 'draw2'], [G, 'number', 1]],
+      ],
+      top: [Y, 'number', 5],
+    });
+    s = applyAction(s, 'p0', { type: 'play', cardId: cardId(s, 0, 'wildReverseDraw4') }).state;
+    s = applyAction(s, 'p0', { type: 'chooseColor', color: Y }).state;
+    expect(s.phase).toMatchObject({ kind: 'respondToStack', minValue: 4 });
+    expect(s.players[s.currentIndex]?.id).toBe('p1');
+
+    // Yellow is in play: the yellow +4 and the wild +6 can stack, the red +4 and the +2 can't.
+    const hand = s.players[1]!.hand;
+    const legal = legalCardIds(s, 'p1').map((id) => hand.find((c) => c.id === id)!);
+    expect(legal.map((c) => `${c.color ?? 'wild'} ${c.kind.type}`).sort()).toEqual(['wild wildDraw6', 'yellow draw4']);
+    const redDraw4 = hand.find((c) => c.color === R && c.kind.type === 'draw4')!;
+    expectCode(() => applyAction(s, 'p1', { type: 'play', cardId: redDraw4.id }), 'illegal_card');
+
+    // Same card, different colour: blue +4 stacks on red +4.
+    let t: GameState = makeState({
+      hands: [
+        [[R, 'draw4'], [R, 'number', 1]],
+        [[B, 'draw4'], [B, 'number', 1]],
+      ],
+      top: [R, 'number', 5],
+    });
+    t = applyAction(t, 'p0', { type: 'play', cardId: cardId(t, 0, 'draw4') }).state;
+    t = applyAction(t, 'p1', { type: 'play', cardId: cardId(t, 1, 'draw4') }).state;
+    expect(t.phase).toMatchObject({ kind: 'respondToStack', pending: 8 });
   });
 
   it('rejects stacking a lower draw card', () => {
