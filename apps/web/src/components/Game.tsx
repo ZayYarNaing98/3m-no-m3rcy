@@ -1054,20 +1054,27 @@ function Sheet({
 }: {
   title: string;
   subtitle?: string;
-  /** Mid-turn choices: on phones, sit at the top with a light backdrop so your hand stays visible below. */
+  /**
+   * Mid-turn choices: on phones, a full-width panel dropping from the top, over a backdrop that
+   * fades out downwards so your hand stays visible below.
+   */
   peek?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div
-      className={`fixed inset-0 z-40 flex justify-center p-3 sm:items-center sm:bg-black/60 ${
-        peek ? 'items-start bg-black/25 pt-[max(env(safe-area-inset-top),0.75rem)]' : 'items-end bg-black/60'
+      className={`fixed inset-0 z-40 flex justify-center sm:items-center sm:bg-none sm:bg-black/60 sm:p-3 ${
+        peek ? 'items-start bg-gradient-to-b from-black/80 via-black/40 to-transparent' : 'items-end bg-black/60 p-3'
       }`}
     >
       <div
         role="dialog"
         aria-label={title}
-        className={`w-full max-w-sm rounded-3xl bg-slate-900 shadow-2xl ring-1 ring-white/10 ${peek ? 'p-4 sm:p-5' : 'p-5'}`}
+        className={`w-full bg-slate-900 shadow-2xl ring-1 ring-white/10 sm:max-w-sm sm:rounded-3xl sm:p-5 ${
+          peek
+            ? 'rounded-b-3xl px-4 pt-[max(env(safe-area-inset-top),1rem)] pb-4 shadow-[0_16px_40px_rgba(0,0,0,0.6)]'
+            : 'max-w-sm rounded-3xl p-5'
+        }`}
       >
         <h2 className={`font-bold ${peek ? 'text-base sm:text-lg' : 'text-lg'}`}>{title}</h2>
         {subtitle && <p className={`mt-1 text-slate-400 ${peek ? 'text-xs sm:text-sm' : 'text-sm'}`}>{subtitle}</p>}
