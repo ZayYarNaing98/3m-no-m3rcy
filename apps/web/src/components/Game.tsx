@@ -1,4 +1,4 @@
-import { COLORS, MERCY_LIMIT, REACTIONS, sortHand, type Color, type PlayerView, type PublicPlayer } from '@nomercy/engine';
+import { COLORS, MERCY_LIMIT, REACTIONS, sortHand, type Color, type EndOutcome, type EndVote, type PlayerView, type PublicPlayer } from '@nomercy/engine';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { navigate } from '../App';
 import { setSoundEnabled, soundEnabled } from '../sound';
@@ -15,6 +15,7 @@ export function Game() {
   // The table is always dark; light mode is only for the screens around a game.
   useForceDark();
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
   // The table version the player already answered a picker for. Pickers hide as soon as a choice
   // is tapped, instead of waiting for the next table state (which may be held while an
   // elimination plays out).
@@ -76,6 +77,17 @@ export function Game() {
           <span className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-slate-100 ring-1 ring-white/15">
             Turn <span className="tabular-nums">{game.turn}</span>
           </span>
+          {!finished && me?.status === 'active' && !room.endVote && (
+            <button
+              className="flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1.5 font-bold text-slate-100 ring-1 ring-white/15 transition hover:bg-white/20 active:scale-[0.97] sm:px-3.5"
+              onClick={() => setConfirmEnd(true)}
+              aria-label="End game"
+              title="End game"
+            >
+              <span aria-hidden="true">🏁</span>
+              <span className="hidden sm:inline">End game</span>
+            </button>
+          )}
           {!finished && (
             <button
               className="flex items-center gap-1.5 rounded-full bg-red-600/15 px-2.5 py-1.5 font-bold text-red-300 ring-1 ring-red-500/60 transition hover:bg-red-600 hover:text-white active:scale-[0.97] sm:px-3.5"
@@ -178,6 +190,17 @@ export function Game() {
         />
       )}
       {finished && <Results game={game} isHost={room.hostId === playerId} />}
+      {room.endVote && !finished && <VoteBanner vote={room.endVote} game={game} />}
+      {confirmEnd && !finished && !room.endVote && (
+        <EndSheet
+          voters={game.players.filter((p) => p.status === 'active').length}
+          onPick={(outcome) => {
+            setConfirmEnd(false);
+            void send('game:endVote', { outcome });
+          }}
+          onCancel={() => setConfirmEnd(false)}
+        />
+      )}
       {confirmLeave && !finished && (
         <LeaveSheet forfeits={me?.status === 'active'} onCancel={() => setConfirmLeave(false)} />
       )}
@@ -312,6 +335,84 @@ function RoomCodeChip({ code }: { code: string }) {
         <path d="M13 7V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2" />
       </svg>
     </button>
+  );
+}
+
+function EndSheet({
+  voters,
+  onPick,
+  onCancel,
+}: {
+  voters: number;
+  onPick: (outcome: EndOutcome) => void;
+  onCancel: () => void;
+}) {
+  const needed = Math.floor(voters / 2) + 1;
+  return (
+    <Sheet
+      title="End this game?"
+      subtitle={`This starts a vote: ${needed} of the ${voters} players still in need to agree within 30 seconds. Your vote counts as yes.`}
+    >
+      <div className="flex flex-col gap-2">
+        <button className="btn-primary text-left" onClick={() => onPick('finish')}>
+          🏁 Finish now
+          <span className="block text-xs font-normal opacity-90">Fewest cards wins, then fewest card points</span>
+        </button>
+        <button className="btn-secondary text-left" onClick={() => onPick('cancel')}>
+          ✖ Cancel game
+          <span className="block text-xs font-normal text-slate-400">No winner, everyone goes back to the lobby</span>
+        </button>
+        <button className="btn-secondary" onClick={onCancel}>
+          Keep playing
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** A running vote to end the game: who asked, the tally, a countdown, and buttons for players who haven't voted. */
+function VoteBanner({ vote, game }: { vote: EndVote; game: PlayerView }) {
+  const { playerId, send } = useGame();
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const name = (id: string) => (id === playerId ? 'You' : (game.players.find((p) => p.id === id)?.name ?? 'Someone'));
+  const left = Math.max(0, Math.ceil((vote.expiresAt - now) / 1000));
+  const needed = Math.floor(vote.voterIds.length / 2) + 1;
+  const canVote =
+    !!playerId && vote.voterIds.includes(playerId) && !vote.yesIds.includes(playerId) && !vote.noIds.includes(playerId);
+  const mine = playerId && vote.yesIds.includes(playerId) ? '✅' : playerId && vote.noIds.includes(playerId) ? '❌' : null;
+
+  return (
+    <div className="fixed inset-x-0 top-14 z-30 flex justify-center px-3">
+      <div
+        role="status"
+        className="w-full max-w-sm rounded-2xl bg-slate-900/95 p-3 text-sm shadow-2xl ring-1 ring-amber-300/60"
+      >
+        <p className="font-bold">
+          {vote.outcome === 'finish' ? '🏁' : '✖'} {name(vote.byId)} {vote.byId === playerId ? 'want' : 'wants'} to{' '}
+          {vote.outcome === 'finish' ? 'end the game' : 'cancel the game'}
+        </p>
+        <p className="mt-0.5 text-xs text-slate-400">
+          {vote.outcome === 'finish' ? 'Fewest cards wins.' : 'No winner, back to the lobby.'} {vote.yesIds.length}/{needed}{' '}
+          needed · <span className="tabular-nums">{left}s</span>
+        </p>
+        {canVote ? (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button className="rounded-xl bg-emerald-600 py-1.5 font-bold text-white hover:bg-emerald-500" onClick={() => send('game:vote', { agree: true })}>
+              ✅ Agree
+            </button>
+            <button className="rounded-xl bg-white/10 py-1.5 font-bold hover:bg-white/20" onClick={() => send('game:vote', { agree: false })}>
+              ❌ Keep playing
+            </button>
+          </div>
+        ) : (
+          mine && <p className="mt-1 text-xs text-slate-300">You voted {mine}</p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -938,7 +1039,8 @@ function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
   const seated = game.players.some((p) => p.id === playerId);
   const winnerId = game.phase.kind === 'roundOver' ? game.phase.winnerId : undefined;
   // Set when the match clock ran out: ranked by cards, then card points.
-  const points = game.phase.kind === 'roundOver' ? game.phase.timeUp?.points : undefined;
+  const early = game.phase.kind === 'roundOver' ? game.phase.early : undefined;
+  const points = early?.points;
   const winner = game.players.find((p) => p.id === winnerId);
   const name = (id: string) => (id === playerId ? 'You' : (game.players.find((p) => p.id === id)?.name ?? '?'));
   const others = game.players.filter((p) => p.id !== winnerId && !game.eliminationOrder.includes(p.id));
@@ -950,7 +1052,7 @@ function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
 
   return (
     <Sheet
-      title={`${points ? "⏱ Time's up! " : ''}${winner ? `${name(winner.id)} ${winner.id === playerId ? 'win' : 'wins'}!` : 'Round over'}`}
+      title={`${early ? (early.reason === 'time' ? "⏱ Time's up! " : '🏁 Ended by vote! ') : ''}${winner ? `${name(winner.id)} ${winner.id === playerId ? 'win' : 'wins'}!` : 'Round over'}`}
       subtitle={points ? 'Fewest cards wins; a tie goes to the fewest card points.' : undefined}
     >
       <ol className="space-y-1 text-sm">

@@ -43,4 +43,5 @@ The app is served at `https://em-no-mercy.<your-subdomain>.workers.dev`.
 - Colour Roulette: the player who plays it doesn't pick a colour. The next player names one, flips until it appears, keeps every flipped card, and loses their turn; the named colour becomes the colour in play.
 - Draw takes one card per tap, even when holding a playable card. The turn stays with you: play any legal card or draw again (the 25-card Mercy limit still applies).
 - Match time (optional, set by the host: 5–20 minutes): when the clock runs out the game ends; the player with the fewest cards wins, ties go to the fewest card points (numbers at face value, coloured actions 20, wilds 50), then the earlier seat. A pending stack is dropped.
+- Ending early: any player still in can start a vote to either finish now (scored like the match clock) or cancel (no winner, back to the lobby). It passes when more than half of the players still in agree within 30 seconds; eliminated players and spectators don't vote.
 - A timed-out player draws until playable but keeps the card; after 3 timeouts in a row their turns shrink to 3 seconds.

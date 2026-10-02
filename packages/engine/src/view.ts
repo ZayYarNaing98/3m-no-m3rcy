@@ -1,5 +1,5 @@
 import { current, legalCardIds, topCard } from './engine';
-import type { Card, Color, GameState, PlayerStatus, StackValue } from './types';
+import type { Card, Color, EarlyEnd, GameState, PlayerStatus, StackValue } from './types';
 
 export type PublicPhase =
   | { kind: 'awaitingPlay' }
@@ -8,7 +8,7 @@ export type PublicPhase =
   | { kind: 'chooseColor' }
   | { kind: 'chooseSwapTarget' }
   | { kind: 'rouletteNameColor' }
-  | { kind: 'roundOver'; winnerId: string; timeUp?: { points: Record<string, number> } };
+  | { kind: 'roundOver'; winnerId: string; early?: EarlyEnd };
 
 export interface PublicPlayer {
   id: string;

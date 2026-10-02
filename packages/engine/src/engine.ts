@@ -6,6 +6,7 @@ import {
   type Action,
   type Card,
   type Color,
+  type EarlyEnd,
   type GameEvent,
   type GameState,
   type Phase,
@@ -97,13 +98,14 @@ export function applyAction(state: GameState, playerId: string, action: Action):
 }
 
 /**
- * The match clock ran out: the game ends where it stands. Among players still in, the fewest cards
- * wins, then the fewest card points; a pending stack is dropped. A tie on both goes to the earlier seat.
+ * Ends the game where it stands, because the match clock ran out or the players voted to finish.
+ * Among players still in, the fewest cards wins, then the fewest card points; a pending stack is
+ * dropped. A tie on both goes to the earlier seat.
  */
-export function endByTime(state: GameState): StepResult {
+export function endEarly(state: GameState, reason: EarlyEnd['reason']): StepResult {
   if (state.phase.kind === 'roundOver') throw new EngineError('round_over', 'The round is over');
   const s = cloneState(state);
-  const events: GameEvent[] = [{ type: 'timeUp' }];
+  const events: GameEvent[] = [{ type: reason === 'time' ? 'timeUp' : 'endedByVote' }];
   const points: Record<string, number> = {};
   for (const p of activePlayers(s)) points[p.id] = handPoints(p.hand);
   const [winner] = [...activePlayers(s)].sort(
@@ -112,7 +114,7 @@ export function endByTime(state: GameState): StepResult {
   const w = winner as Player;
   w.status = 'won';
   s.carriedStack = 0;
-  s.phase = { kind: 'roundOver', winnerId: w.id, timeUp: { points } };
+  s.phase = { kind: 'roundOver', winnerId: w.id, early: { reason, points } };
   events.push({ type: 'won', playerId: w.id });
   return { state: s, events };
 }

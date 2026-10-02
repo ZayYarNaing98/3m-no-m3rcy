@@ -19,6 +19,8 @@ export type ClientMessage = { requestId?: string } & (
   | { type: 'room:lobby'; payload: Record<string, never> }
   | { type: 'room:ready'; payload: { ready: boolean } }
   | { type: 'room:react'; payload: { emoji: Reaction } }
+  | { type: 'game:endVote'; payload: { outcome: EndOutcome } }
+  | { type: 'game:vote'; payload: { agree: boolean } }
   | { type: 'room:throw'; payload: { targetId: string; item: Throwable } }
   | { type: 'room:chat'; payload: { text: string } }
 );
@@ -57,7 +59,28 @@ export interface RoomView {
   spectators: number;
   /** When the running game's match clock runs out (server time in ms), or null without a limit. */
   matchEndsAt: number | null;
+  /** A running vote to end the game early, if any. */
+  endVote: EndVote | null;
 }
+
+/** "finish": score the game now (fewest cards wins). "cancel": no winner, back to the lobby. */
+export type EndOutcome = 'finish' | 'cancel';
+
+export interface EndVote {
+  byId: string;
+  outcome: EndOutcome;
+  /** Players still in the game, who are the ones voting. */
+  voterIds: string[];
+  yesIds: string[];
+  noIds: string[];
+  /** Server time in ms when the vote lapses. */
+  expiresAt: number;
+}
+
+/** How long players have to answer a vote to end the game. */
+export const END_VOTE_MS = 30_000;
+/** Minimum gap between the end of one vote and the start of the next. */
+export const END_VOTE_COOLDOWN_MS = 15_000;
 
 export type ServerMessage =
   | { type: 'ack'; requestId: string; ok: true }
@@ -70,6 +93,8 @@ export type ServerMessage =
   | { type: 'throw'; fromId: string; targetId: string; item: Throwable }
   | { type: 'chat'; message: ChatMessage }
   | { type: 'chat:history'; messages: ChatMessage[] }
+  /** A one-off message for everyone, shown as a toast. */
+  | { type: 'notice'; text: string }
   | { type: 'error'; error: ErrorInfo };
 
 export const MIN_PLAYERS = 2;

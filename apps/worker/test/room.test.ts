@@ -196,6 +196,81 @@ describe('room over WebSocket', () => {
   });
 });
 
+describe('voting to end the game', () => {
+  type RoomState = Extract<ServerMessage, { type: 'room:state' }>;
+
+  async function startGame(names: string[]) {
+    const code = await createRoom();
+    const conns = [];
+    for (const name of names) {
+      const c = await connect(code);
+      await c.request('room:join', { name });
+      conns.push(c);
+    }
+    for (const c of conns.slice(1)) await c.request('room:ready', { ready: true });
+    expect((await conns[0]!.request('game:start')).ok).toBe(true);
+    await conns[0]!.waitFor((m) => m.type === 'game:state');
+    return { code, conns };
+  }
+
+  it('finishes the game when a majority agrees', async () => {
+    const { conns } = await startGame(['Ana', 'Ben', 'Cy']);
+    const [a, b, c] = conns as [Awaited<ReturnType<typeof connect>>, Awaited<ReturnType<typeof connect>>, Awaited<ReturnType<typeof connect>>];
+    expect((await b.request('game:endVote', { outcome: 'finish' })).ok).toBe(true);
+    const running = a.latest('room:state')!.room.endVote!;
+    expect(running).toMatchObject({ outcome: 'finish', voterIds: expect.any(Array), noIds: [] });
+    expect(running.yesIds).toHaveLength(1);
+    expect(await c.request('game:endVote', { outcome: 'cancel' })).toMatchObject({ ok: false, error: { code: 'vote_running' } });
+
+    const from = a.msgs.length;
+    expect((await c.request('game:vote', { agree: true })).ok).toBe(true);
+    const done = await a.waitFor((m): m is RoomState => m.type === 'room:state' && m.room.status === 'finished', from);
+    expect(done.room.endVote).toBeNull();
+    expect(a.latest('game:state')!.game.phase).toMatchObject({ kind: 'roundOver', early: { reason: 'vote' } });
+    await a.waitFor((m) => m.type === 'notice', from);
+  });
+
+  it('cancels back to the lobby, and drops a vote once it cannot pass', async () => {
+    const { code, conns } = await startGame(['Ana', 'Ben']);
+    const [a, b] = conns as [Awaited<ReturnType<typeof connect>>, Awaited<ReturnType<typeof connect>>];
+
+    // Two players: both must agree, so one "no" ends the vote.
+    await a.request('game:endVote', { outcome: 'cancel' });
+    const from = a.msgs.length;
+    await b.request('game:vote', { agree: false });
+    await a.waitFor((m) => m.type === 'notice', from);
+    expect(a.latest('room:state')!.room).toMatchObject({ status: 'playing', endVote: null });
+    expect(await a.request('game:endVote', { outcome: 'cancel' })).toMatchObject({ ok: false, error: { code: 'slow_down' } });
+
+    // Skip the cooldown, then pass a cancel vote.
+    await runInDurableObject(env.ROOMS.getByName(code), (instance: Room) => {
+      (instance as unknown as { room: { lastVoteEndedAt: number } }).room.lastVoteEndedAt = 0;
+    });
+    await a.request('game:endVote', { outcome: 'cancel' });
+    await b.request('game:vote', { agree: true });
+    await a.waitFor((m): m is RoomState => m.type === 'room:state' && m.room.status === 'lobby');
+
+    const watcher = await connect(code);
+    expect(await watcher.request('game:vote', { agree: true })).toMatchObject({ ok: false, error: { code: 'not_seated' } });
+  });
+
+  it('lets a vote lapse on the alarm', async () => {
+    const { code, conns } = await startGame(['Ana', 'Ben', 'Cy']);
+    const a = conns[0]!;
+    await a.request('game:endVote', { outcome: 'finish' });
+    const stub = env.ROOMS.getByName(code);
+    await runInDurableObject(stub, (instance: Room) => {
+      const room = (instance as unknown as { room: { endVote: { expiresAt: number }; deadline: number } }).room;
+      room.endVote.expiresAt = Date.now() - 1000;
+      room.deadline = Date.now() + 60_000;
+    });
+    const from = a.msgs.length;
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await a.waitFor((m) => m.type === 'notice', from);
+    expect(a.latest('room:state')!.room).toMatchObject({ status: 'playing', endVote: null });
+  });
+});
+
 describe('room persistence and timers', () => {
   it('ends the game when the match clock runs out', async () => {
     const code = await createRoom();

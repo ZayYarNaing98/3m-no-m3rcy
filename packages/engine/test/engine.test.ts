@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyAction,
   buildDeck,
-  endByTime,
+  endEarly,
   createGame,
   DECK_SIZE,
   EngineError,
@@ -447,9 +447,9 @@ describe('match clock', () => {
       ],
       top: [G, 'number', 5],
     });
-    const { state, events } = endByTime(s);
+    const { state, events } = endEarly(s, 'time');
     expect(events.map((e) => e.type)).toEqual(['timeUp', 'won']);
-    expect(state.phase).toEqual({ kind: 'roundOver', winnerId: 'p1', timeUp: { points: { p0: 6, p1: 59, p2: 10 } } });
+    expect(state.phase).toEqual({ kind: 'roundOver', winnerId: 'p1', early: { reason: 'time', points: { p0: 6, p1: 59, p2: 10 } } });
     expect(state.players[1]?.status).toBe('won');
   });
 
@@ -463,13 +463,13 @@ describe('match clock', () => {
       top: [Y, 'number', 5],
     });
     // p0 = 51, p1 = 22, p2 = 17 points: p2 wins.
-    expect(endByTime(s).state.phase).toMatchObject({ winnerId: 'p2' });
+    expect(endEarly(s, 'time').state.phase).toMatchObject({ winnerId: 'p2' });
 
     const tied = makeState({
       hands: [[[R, 'number', 4]], [[B, 'number', 4]]],
       top: [Y, 'number', 5],
     });
-    expect(endByTime(tied).state.phase).toMatchObject({ winnerId: 'p0' });
+    expect(endEarly(tied, 'time').state.phase).toMatchObject({ winnerId: 'p0' });
   });
 
   it('ignores eliminated players and drops a pending stack', () => {
@@ -484,8 +484,18 @@ describe('match clock', () => {
     s = { ...s, players: s.players.map((p) => (p.id === 'p2' ? { ...p, status: 'eliminated' as const } : p)) };
     s = applyAction(s, 'p0', { type: 'play', cardId: cardId(s, 0, 'draw4') }).state;
     expect(s.phase.kind).toBe('respondToStack');
-    const { state } = endByTime(s);
+    const { state } = endEarly(s, 'time');
     expect(state.phase).toMatchObject({ kind: 'roundOver', winnerId: 'p0' });
     expect(state.players[1]?.hand).toHaveLength(4);
+  });
+
+  it('ends by vote with the same scoring', () => {
+    const s = makeState({
+      hands: [[[R, 'number', 1], [R, 'number', 2]], [[B, 'number', 9]]],
+      top: [Y, 'number', 5],
+    });
+    const { state, events } = endEarly(s, 'vote');
+    expect(events.map((e) => e.type)).toEqual(['endedByVote', 'won']);
+    expect(state.phase).toEqual({ kind: 'roundOver', winnerId: 'p1', early: { reason: 'vote', points: { p0: 3, p1: 9 } } });
   });
 });

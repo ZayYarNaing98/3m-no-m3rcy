@@ -40,6 +40,8 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   msg('room:lobby', empty),
   msg('room:ready', z.object({ ready: z.boolean() })),
   msg('room:react', z.object({ emoji: z.enum(REACTIONS) })),
+  msg('game:endVote', z.object({ outcome: z.enum(['finish', 'cancel']) })),
+  msg('game:vote', z.object({ agree: z.boolean() })),
   msg('room:throw', z.object({ targetId: id, item: z.enum(THROWABLES) })),
   msg(
     'room:chat',

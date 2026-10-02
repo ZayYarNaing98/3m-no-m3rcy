@@ -237,6 +237,9 @@ export function TableFx() {
         case 'timeUp':
           float(anchorRect('discard'), "Time's up!", 'bad');
           break;
+        case 'endedByVote':
+          float(anchorRect('discard'), 'Game over!', 'bad');
+          break;
         case 'won':
           playRoundWon(t);
           float(seatOf(e.playerId), 'Winner!', 'good');

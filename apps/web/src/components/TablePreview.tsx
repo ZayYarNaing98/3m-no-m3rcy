@@ -45,6 +45,7 @@ export function TablePreview() {
         players: names.slice(0, n).map((name, i) => ({ id: `p${i}`, name, connected: i !== 3, afk: false, ready: false })),
         spectators: Number(params.get('watching')) || 0,
         matchEndsAt: null,
+        endVote: null,
       },
       log: ['Seint played red 4', 'zay drew 2', 'Mya played red Skip'],
     });

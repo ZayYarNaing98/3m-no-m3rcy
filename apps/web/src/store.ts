@@ -330,6 +330,9 @@ function handleMessage(msg: ServerMessage) {
         thrown: { seq: (get().thrown?.seq ?? 0) + 1, fromId: msg.fromId, targetId: msg.targetId, item: msg.item },
       });
       break;
+    case 'notice':
+      get().showToast(msg.text);
+      break;
     case 'error':
       get().showToast(msg.error.message);
       break;

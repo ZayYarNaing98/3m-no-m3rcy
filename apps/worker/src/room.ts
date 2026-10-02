@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   AFK_STRIKES,
   applyAction,
-  endByTime,
+  endEarly,
   createGame,
   current,
   DEFAULT_TURN_SECONDS,
@@ -20,6 +20,9 @@ import {
   type ErrorInfo,
   type GameEvent,
   type GameState,
+  type EndVote,
+  END_VOTE_COOLDOWN_MS,
+  END_VOTE_MS,
   type RoomSettings,
   type RoomStatus,
   type RoomView,
@@ -55,6 +58,9 @@ interface RoomRecord {
   deadline: number | null;
   /** When the match clock runs out; optional so rooms saved before it existed still load. */
   matchEndsAt?: number | null;
+  /** A running vote to end the game early; optional so older rooms still load. */
+  endVote?: EndVote | null;
+  lastVoteEndedAt?: number;
   emptySince: number | null;
   /** Recent chat, oldest first. Optional so rooms saved before chat existed still load. */
   chat?: ChatMessage[];
@@ -168,8 +174,14 @@ export class Room extends DurableObject<Env> {
     if (!room) return;
     const now = Date.now();
 
+    if (room.endVote && now >= room.endVote.expiresAt - 50) {
+      this.closeVote('⏱ The vote to end the game ran out of time');
+      this.save();
+      this.broadcastRoom();
+    }
+
     if (room.status === 'playing' && room.game && room.matchEndsAt && now >= room.matchEndsAt - 50) {
-      const { state, events } = endByTime(room.game);
+      const { state, events } = endEarly(room.game, 'time');
       this.commit(state, events);
     } else if (room.status === 'playing' && room.game && room.deadline !== null && now >= room.deadline - 50) {
       const seat = this.seat(current(room.game).id);
@@ -255,6 +267,40 @@ export class Room extends DurableObject<Env> {
         return;
       }
 
+      case 'game:endVote': {
+        const seat = this.requireSeat(me);
+        if (room.status !== 'playing' || !room.game) throw new RoomError('no_game', 'No game is running');
+        const voters = this.voters();
+        if (!voters.includes(seat.id)) throw new RoomError('not_active', 'Only players still in can end the game');
+        if (room.endVote) throw new RoomError('vote_running', 'A vote is already running');
+        if (Date.now() - (room.lastVoteEndedAt ?? 0) < END_VOTE_COOLDOWN_MS) {
+          throw new RoomError('slow_down', 'Wait a moment before starting another vote');
+        }
+        room.endVote = {
+          byId: seat.id,
+          outcome: msg.payload.outcome,
+          voterIds: voters,
+          yesIds: [seat.id],
+          noIds: [],
+          expiresAt: Date.now() + END_VOTE_MS,
+        };
+        this.settleVote();
+        break;
+      }
+
+      case 'game:vote': {
+        const seat = this.requireSeat(me);
+        const vote = room.endVote;
+        if (!vote) throw new RoomError('no_vote', 'There is no vote running');
+        if (!vote.voterIds.includes(seat.id)) throw new RoomError('not_active', 'Only players still in can vote');
+        if (vote.yesIds.includes(seat.id) || vote.noIds.includes(seat.id)) {
+          throw new RoomError('already_voted', 'You already voted');
+        }
+        (msg.payload.agree ? vote.yesIds : vote.noIds).push(seat.id);
+        this.settleVote();
+        break;
+      }
+
       case 'room:throw': {
         const seat = this.requireSeat(me);
         const target = this.seat(msg.payload.targetId);
@@ -305,12 +351,7 @@ export class Room extends DurableObject<Env> {
       case 'room:lobby': {
         this.requireHost(me);
         if (room.status !== 'finished') throw new RoomError('game_in_progress', 'Finish the game first');
-        // Seats given up mid-game are dropped so the lobby shows who is still here.
-        room.seats = this.seated();
-        room.game = null;
-        room.deadline = null;
-        room.status = 'lobby';
-        room.stateVersion++;
+        this.backToLobby();
         break;
       }
 
@@ -343,6 +384,7 @@ export class Room extends DurableObject<Env> {
         room.stateVersion++;
         const minutes = room.settings.matchMinutes ?? 0;
         room.matchEndsAt = minutes > 0 ? Date.now() + minutes * 60_000 : null;
+        room.endVote = null;
         this.resetDeadline();
         this.broadcastRoom();
         this.broadcastGame([]);
@@ -390,6 +432,7 @@ export class Room extends DurableObject<Env> {
       room.status = 'finished';
       room.deadline = null;
       room.matchEndsAt = null;
+      room.endVote = null;
     } else if (turnKey(state) !== before) {
       this.resetDeadline();
     }
@@ -398,12 +441,70 @@ export class Room extends DurableObject<Env> {
     if (room.status === 'finished') this.broadcastRoom();
   }
 
+  /** Players who may vote to end the game: still in it and still seated. */
+  private voters(): string[] {
+    const game = this.requireRoom().game;
+    if (!game) return [];
+    return game.players.filter((p) => p.status === 'active' && this.seat(p.id)).map((p) => p.id);
+  }
+
+  /** Passes the vote on a strict majority of players still in, or drops it once that can't happen. */
+  private settleVote(): void {
+    const room = this.requireRoom();
+    const vote = room.endVote;
+    if (!vote || room.status !== 'playing' || !room.game) return;
+    const voters = this.voters();
+    vote.voterIds = vote.voterIds.filter((id) => voters.includes(id));
+    vote.yesIds = vote.yesIds.filter((id) => vote.voterIds.includes(id));
+    vote.noIds = vote.noIds.filter((id) => vote.voterIds.includes(id));
+    const n = vote.voterIds.length;
+    const name = this.seat(vote.byId)?.name ?? 'Someone';
+
+    if (vote.yesIds.length * 2 > n) {
+      this.closeVote(
+        vote.outcome === 'finish'
+          ? `🏁 Game ended by vote (started by ${name})`
+          : `✖ Game cancelled by vote (started by ${name})`,
+      );
+      if (vote.outcome === 'finish') {
+        const { state, events } = endEarly(room.game, 'vote');
+        this.commit(state, events);
+      } else {
+        this.backToLobby();
+      }
+    } else if ((n - vote.noIds.length) * 2 <= n) {
+      this.closeVote('The vote to end the game did not pass');
+    }
+  }
+
+  private closeVote(notice: string): void {
+    const room = this.requireRoom();
+    room.endVote = null;
+    room.lastVoteEndedAt = Date.now();
+    const msg: ServerMessage = { type: 'notice', text: notice };
+    for (const ws of this.ctx.getWebSockets()) this.send(ws, msg);
+  }
+
+  /** Back to the lobby with no game. Seats given up mid-game are dropped so the lobby shows who is still here. */
+  private backToLobby(): void {
+    const room = this.requireRoom();
+    room.seats = this.seated();
+    room.game = null;
+    room.deadline = null;
+    room.matchEndsAt = null;
+    room.endVote = null;
+    room.status = 'lobby';
+    room.stateVersion++;
+  }
+
   private leaveSeat(seat: Seat): void {
     const room = this.requireRoom();
     if (room.status === 'playing' && room.game) {
       seat.left = true;
       const p = room.game.players.find((x) => x.id === seat.id);
       if (p?.status === 'active') this.runAction(seat.id, { type: 'forfeit' });
+      // One fewer voter can decide a running vote.
+      this.settleVote();
     } else {
       room.seats = room.seats.filter((s) => s.id !== seat.id);
     }
@@ -449,6 +550,7 @@ export class Room extends DurableObject<Env> {
     const times: number[] = [];
     if (room.status === 'playing' && room.deadline !== null) times.push(room.deadline);
     if (room.status === 'playing' && room.matchEndsAt) times.push(room.matchEndsAt);
+    if (room.endVote) times.push(room.endVote.expiresAt);
     if (this.connectedIds().size === 0) {
       room.emptySince ??= Date.now();
       times.push(room.emptySince + EMPTY_ROOM_TTL_MS);
@@ -478,6 +580,7 @@ export class Room extends DurableObject<Env> {
       })),
       spectators: this.ctx.getWebSockets().filter((ws) => ws !== exclude && !this.attachment(ws).playerId).length,
       matchEndsAt: room.status === 'playing' ? (room.matchEndsAt ?? null) : null,
+      endVote: room.endVote ?? null,
     };
   }
 
