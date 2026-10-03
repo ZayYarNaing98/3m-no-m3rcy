@@ -118,9 +118,10 @@ export const REACTION_COOLDOWN_MS = 600;
 /** Things players can throw at each other. The server only relays these. */
 export const THROWABLES = [
   'shoe', 'stone', 'hammer', 'tomato',
-  'egg', 'bomb', 'rose', 'water',
-  'poop', 'pie', 'fish', 'banana',
-  'brick', 'firecracker', 'kiss', 'cake',
+  'egg', 'bomb', 'rose', 'poop',
+  'pie', 'banana', 'brick', 'firecracker',
+  'kiss', 'cake', 'sock', 'glove',
+  'pizza', 'chili', 'snowball', 'balloon',
 ] as const;
 export type Throwable = (typeof THROWABLES)[number];
 /** Minimum gap between one player's throws. */

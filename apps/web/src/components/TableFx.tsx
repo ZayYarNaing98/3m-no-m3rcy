@@ -357,6 +357,39 @@ interface Sprite {
   duration: number;
 }
 
+/** A stink cloud drifting up and a fly buzzing round the target, for dirty things. */
+function stinkSprites(): Sprite[] {
+  return [
+    {
+      text: '💨',
+      size: 40,
+      duration: 1800,
+      keyframes: [
+        { transform: 'translate(0, 0) scale(0.5)', opacity: 0 },
+        { transform: 'translate(-6px, -18px) scale(1.2)', opacity: 0.9, offset: 0.3 },
+        { transform: 'translate(8px, -40px) scale(1.5)', opacity: 0.7, offset: 0.7 },
+        { transform: 'translate(0, -60px) scale(1.7)', opacity: 0 },
+      ],
+    },
+    {
+      // Loops round the target's head a couple of times, then flies off.
+      text: '🪰',
+      size: 22,
+      duration: 2000,
+      keyframes: [
+        { transform: 'translate(-24px, -10px)', opacity: 0 },
+        { transform: 'translate(0, -30px)', opacity: 1, offset: 0.1 },
+        { transform: 'translate(24px, -10px)', opacity: 1, offset: 0.25 },
+        { transform: 'translate(0, 10px)', opacity: 1, offset: 0.4 },
+        { transform: 'translate(-24px, -12px)', opacity: 1, offset: 0.55 },
+        { transform: 'translate(0, -32px)', opacity: 1, offset: 0.7 },
+        { transform: 'translate(22px, -12px)', opacity: 1, offset: 0.85 },
+        { transform: 'translate(60px, -50px)', opacity: 0 },
+      ],
+    },
+  ];
+}
+
 function impactSprites(item: Throwable, still: boolean): Sprite[] {
   const info = THROWABLE_INFO[item];
   // Reduced motion: just fade the result in and out where it lands.
@@ -367,6 +400,7 @@ function impactSprites(item: Throwable, still: boolean): Sprite[] {
   switch (info.impact) {
     case 'bonk':
       return [
+        ...(info.stinky ? stinkSprites() : []),
         {
           text: '💥',
           size: 48,

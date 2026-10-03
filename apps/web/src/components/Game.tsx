@@ -4,6 +4,7 @@ import { navigate } from '../App';
 import { setSoundEnabled, soundEnabled } from '../sound';
 import { useGame } from '../store';
 import { useForceDark } from '../theme';
+import { useTurnAlerts } from '../turnAlerts';
 import { Avatar } from './Avatar';
 import { Card, CardBack, COLOR_BG, COLOR_RING } from './Card';
 import { ChatButton, ChatPanel } from './Chat';
@@ -14,6 +15,7 @@ export function Game() {
   const { game, room, playerId, stateVersion, deadline, log, send } = useGame();
   // The table is always dark; light mode is only for the screens around a game.
   useForceDark();
+  useTurnAlerts(game, playerId, room?.status === 'playing' ? deadline : null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   // The table version the player already answered a picker for. Pickers hide as soon as a choice

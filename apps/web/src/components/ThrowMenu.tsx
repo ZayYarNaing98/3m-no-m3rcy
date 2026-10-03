@@ -11,7 +11,7 @@ export interface ThrowTarget {
 }
 
 const MENU_W = 232;
-const MENU_H = 270;
+const MENU_H = 330;
 const GAP = 8;
 
 /** A small popover of things to throw at another player, opened by tapping their seat. */

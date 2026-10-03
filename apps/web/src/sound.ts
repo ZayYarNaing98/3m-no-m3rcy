@@ -426,7 +426,7 @@ export function playThrow(impact: 'bonk' | 'splat' | 'boom' | 'love', item: stri
   switch (impact) {
     case 'bonk': {
       // A hard knock, pitched by how heavy the thing is.
-      const base = { hammer: 140, brick: 150, stone: 200, fish: 300, banana: 320 }[item] ?? 260;
+      const base = { hammer: 140, brick: 150, stone: 200, glove: 180, banana: 320, sock: 360 }[item] ?? 260;
       blip(c, { type: 'sine', from: base * 2, to: base * 0.6, start: hit, length: 0.16, peak: 0.5 });
       noiseBurst(c, { start: hit, length: 0.06, peak: 0.35, type: 'lowpass', from: 3000 });
       if (item === 'hammer') blip(c, { type: 'triangle', from: 1800, start: hit + 0.01, length: 0.25, peak: 0.08 });
@@ -434,11 +434,17 @@ export function playThrow(impact: 'bonk' | 'splat' | 'boom' | 'love', item: stri
     }
     case 'splat':
       // A wet, falling burst of noise.
-      noiseBurst(c, { start: hit, length: 0.2, peak: 0.4, type: 'lowpass', from: item === 'water' ? 3500 : 1800, to: 300 });
+      noiseBurst(c, { start: hit, length: 0.2, peak: 0.4, type: 'lowpass', from: item === 'snowball' ? 3500 : 1800, to: 300 });
       blip(c, { type: 'sine', from: 220, to: 90, start: hit, length: 0.1, peak: 0.25 });
       if (item === 'egg') noiseBurst(c, { start: hit, length: 0.03, peak: 0.25, type: 'highpass', from: 3000 });
       break;
     case 'boom':
+      // A balloon just pops: a short bright snap instead of an explosion.
+      if (item === 'balloon') {
+        noiseBurst(c, { start: hit, length: 0.05, peak: 0.5, type: 'highpass', from: 1500 });
+        blip(c, { type: 'sine', from: 900, to: 300, start: hit, length: 0.08, peak: 0.2 });
+        break;
+      }
       noiseBurst(c, { start: hit, length: 0.24, peak: 0.55, type: 'lowpass', from: 1200, to: 120 });
       blip(c, { type: 'sine', from: 120, to: 40, start: hit, length: 0.45, peak: 0.6 });
       // A firecracker crackles after the bang.
@@ -453,4 +459,26 @@ export function playThrow(impact: 'bonk' | 'splat' | 'boom' | 'love', item: stri
       blip(c, { type: 'triangle', from: 1320, start: hit + 0.12, length: 0.35, peak: 0.18 });
       break;
   }
+}
+
+// --- Turn alerts --------------------------------------------------------------
+
+/** Your turn: a soft rising two-note chime, gentler than the UNO call. */
+export function playYourTurn(): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+  const t = c.currentTime;
+  blip(c, { type: 'sine', from: 660, start: t, length: 0.18, peak: 0.18 });
+  blip(c, { type: 'sine', from: 990, start: t + 0.12, length: 0.3, peak: 0.16 });
+}
+
+/** A few seconds left on your turn: two quick low ticks. */
+export function playTimeWarning(): void {
+  if (!soundEnabled()) return;
+  const c = audio();
+  if (!c || c.state !== 'running') return;
+  const t = c.currentTime;
+  blip(c, { type: 'triangle', from: 520, start: t, length: 0.08, peak: 0.22 });
+  blip(c, { type: 'triangle', from: 520, start: t + 0.16, length: 0.08, peak: 0.22 });
 }
