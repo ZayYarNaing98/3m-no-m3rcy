@@ -894,7 +894,10 @@ function StatusLine({
         text = 'Play the card you drew';
         break;
       case 'respondToStack':
-        text = `Stack a ${game.activeColor} or wild +${phase.minValue} or higher, or take all ${phase.pending}`;
+        text =
+          phase.minValue === 2
+            ? `Stack any +4, a ${game.activeColor} +2, or a wild draw card, or take all ${phase.pending}`
+            : `Stack a ${game.activeColor} or wild +${phase.minValue} or higher, or take all ${phase.pending}`;
         break;
       default:
         text = 'Your move';

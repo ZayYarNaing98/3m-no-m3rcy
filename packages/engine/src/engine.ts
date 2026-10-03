@@ -500,9 +500,12 @@ function canPlayNormally(s: GameState, card: Card): boolean {
 /**
  * A draw card can go on a stack when it is worth at least the minimum and, like any play,
  * it is wild, matches the colour in play, or is the same card as the top one (blue +4 on red +4).
+ * One exception: a coloured +4 can go on a +2 stack in any colour (blue +4 on red +2).
  */
 function canStack(s: GameState, card: Card, minValue: number): boolean {
-  return drawValue(card) >= minValue && canPlayNormally(s, card);
+  if (drawValue(card) < minValue) return false;
+  if (card.kind.type === 'draw4' && minValue === 2) return true;
+  return canPlayNormally(s, card);
 }
 
 function endTurn(ctx: Ctx, skip = 0): void {

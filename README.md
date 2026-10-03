@@ -38,7 +38,7 @@ The app is served at `https://em-no-mercy.<your-subdomain>.workers.dev`.
 
 ## Rule choices
 
-- Stacking accepts a draw card of equal or higher value (+2 ≤ +4 ≤ +6 ≤ +10) that could also be played normally: a wild draw card, a coloured one in the colour in play, or the same card as the top one (blue +4 on red +4).
+- Stacking accepts a draw card of equal or higher value (+2 ≤ +4 ≤ +6 ≤ +10) that could also be played normally: a wild draw card, a coloured one in the colour in play, or the same card as the top one (blue +4 on red +4). A coloured +4 can also go on a +2 in any colour (blue +4 on red +2).
 - The first discard is always a number card.
 - Colour Roulette: the player who plays it doesn't pick a colour. The next player names one, flips until it appears, keeps every flipped card, and loses their turn; the named colour becomes the colour in play.
 - Draw takes one card per tap, even when holding a playable card. The turn stays with you: play any legal card or draw again (the 25-card Mercy limit still applies).

@@ -244,6 +244,25 @@ describe('stacking', () => {
     expect(r.state.phase.kind).toBe('awaitingPlay');
   });
 
+  it('stacks a coloured +4 of any colour on a +2', () => {
+    let s: GameState = makeState({
+      hands: [
+        [[R, 'draw2'], [R, 'number', 1]],
+        [[B, 'draw4'], [G, 'draw2'], [Y, 'number', 1]],
+      ],
+      top: [R, 'number', 5],
+    });
+    s = applyAction(s, 'p0', { type: 'play', cardId: cardId(s, 0, 'draw2') }).state;
+    expect(s.phase).toMatchObject({ kind: 'respondToStack', minValue: 2 });
+    const hand = s.players[1]!.hand;
+    const legal = legalCardIds(s, 'p1').map((id) => hand.find((c) => c.id === id)!);
+    // The blue +4 is higher; the green +2 is the same card as the top one.
+    expect(legal.map((c) => `${c.color} ${c.kind.type}`).sort()).toEqual(['blue draw4', 'green draw2']);
+    s = applyAction(s, 'p1', { type: 'play', cardId: cardId(s, 1, 'draw4') }).state;
+    expect(s.phase).toMatchObject({ kind: 'respondToStack', pending: 6, minValue: 4 });
+    expect(s.activeColor).toBe(B);
+  });
+
   it('only stacks coloured draw cards in the colour in play or on the same card', () => {
     // Two players: the Wild Reverse +4 still passes the stack to p1.
     let s: GameState = makeState({
