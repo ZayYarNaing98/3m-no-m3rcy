@@ -4,6 +4,7 @@ import { navigate } from '../App';
 import { useGame } from '../store';
 import { Avatar } from './Avatar';
 import { ChatButton, ChatPanel } from './Chat';
+import { leaderId } from '../scoreboard';
 import { TableFx } from './TableFx';
 import { ThemeToggle } from './ThemeToggle';
 import { seatRectOf, ThrowMenu, type ThrowTarget } from './ThrowMenu';
@@ -12,12 +13,14 @@ export function Lobby() {
   const { room, playerId, send, leave } = useGame();
   const [copied, setCopied] = useState(false);
   const [throwTarget, setThrowTarget] = useState<ThrowTarget | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
   if (!room) return null;
   const isHost = room.hostId === playerId;
   const me = room.players.find((p) => p.id === playerId);
   const guests = room.players.filter((p) => p.id !== room.hostId);
   const readyCount = guests.filter((p) => p.ready).length;
   const allReady = readyCount === guests.length;
+  const leader = leaderId(room);
   const link = `${location.origin}/r/${room.code}`;
 
   async function copy() {
@@ -45,7 +48,15 @@ export function Lobby() {
 
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-muted">Players · {room.players.length}/10</h2>
+          <h2 className="text-sm font-semibold text-muted">
+            Players · {room.players.length}/10
+            {room.gamesPlayed > 0 && (
+              <span className="font-normal">
+                {' '}
+                · 🎮 {room.gamesPlayed} {room.gamesPlayed === 1 ? 'game' : 'games'}
+              </span>
+            )}
+          </h2>
           <ChatButton />
         </div>
         <ul className="divide-y divide-line-soft rounded-2xl bg-surface light:shadow-md light:ring-1 light:ring-line">
@@ -69,7 +80,17 @@ export function Lobby() {
               <span className="flex-1 truncate">
                 {p.name}
                 {p.id === playerId && <span className="text-subtle"> (you)</span>}
+                {p.id === leader && (
+                  <span className="ml-1" title="Most wins" aria-label="Most wins">
+                    👑
+                  </span>
+                )}
               </span>
+              {room.gamesPlayed > 0 && (
+                <span className="text-xs font-semibold text-muted tabular-nums" title={`${p.wins} wins`}>
+                  🏆{p.wins}
+                </span>
+              )}
               {p.id === room.hostId ? (
                 <span className="rounded-full bg-amber-400/20 px-2 text-xs text-amber-300 light:text-amber-700">host</span>
               ) : p.ready ? (
@@ -86,7 +107,26 @@ export function Lobby() {
           ))}
         </ul>
         {room.players.length > 1 && (
-          <p className="mt-2 text-center text-xs text-subtle">Tap someone's avatar to throw something at them 👟🍅</p>
+          <p className="mt-2 text-center text-xs text-subtle">Tap someone's avatar to throw something at them 🥾🍅</p>
+        )}
+        {isHost && room.gamesPlayed > 0 && (
+          <div className="mt-1 text-center">
+            {/* Two taps instead of a browser confirm dialog. */}
+            <button
+              className={`text-xs underline-offset-4 hover:underline ${confirmReset ? 'font-bold text-red-400 light:text-red-600' : 'text-subtle'}`}
+              onClick={() => {
+                if (!confirmReset) {
+                  setConfirmReset(true);
+                  setTimeout(() => setConfirmReset(false), 3000);
+                  return;
+                }
+                setConfirmReset(false);
+                void send('room:resetScores');
+              }}
+            >
+              {confirmReset ? 'Tap again to reset all scores' : 'Reset scores'}
+            </button>
+          </div>
         )}
       </section>
 

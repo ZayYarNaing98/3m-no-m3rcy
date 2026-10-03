@@ -126,6 +126,38 @@ describe('room over WebSocket', () => {
     expect(bad).toMatchObject({ ok: false, error: { code: 'unknown_token' } });
   });
 
+  it('keeps a room scoreboard that the host can reset', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const b = await connect(code);
+    const c = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    await b.request('room:join', { name: 'Ben' });
+    await c.request('room:join', { name: 'Cy' });
+    await b.request('room:ready', { ready: true });
+    await c.request('room:ready', { ready: true });
+    await a.request('game:start');
+    expect(a.latest('room:state')!.room.gamesPlayed).toBe(0);
+
+    // Ben and Cy leave, so Ana wins the game.
+    await b.request('room:leave');
+    await c.request('room:leave');
+    const finished = await a.waitFor(
+      (m): m is Extract<ServerMessage, { type: 'room:state' }> => m.type === 'room:state' && m.room.status === 'finished',
+    );
+    expect(finished.room.gamesPlayed).toBe(1);
+    expect(finished.room.players.find((p) => p.name === 'Ana')?.wins).toBe(1);
+
+    const d = await connect(code);
+    await a.request('room:lobby');
+    await d.request('room:join', { name: 'Dee' });
+    expect(await d.request('room:resetScores')).toMatchObject({ ok: false, error: { code: 'not_host' } });
+    expect((await a.request('room:resetScores')).ok).toBe(true);
+    const reset = a.latest('room:state')!.room;
+    expect(reset.gamesPlayed).toBe(0);
+    expect(reset.players.every((p) => p.wins === 0)).toBe(true);
+  });
+
   it('lets the host take a finished room back to the lobby', async () => {
     const code = await createRoom();
     const a = await connect(code);

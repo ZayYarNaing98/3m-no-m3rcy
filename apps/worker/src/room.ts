@@ -45,6 +45,8 @@ interface Seat {
   left: boolean;
   /** Optional so seats saved before the ready check still load (as not ready). */
   ready?: boolean;
+  /** Games won in this room; optional so older rooms still load. */
+  wins?: number;
 }
 
 interface RoomRecord {
@@ -61,6 +63,7 @@ interface RoomRecord {
   /** A running vote to end the game early; optional so older rooms still load. */
   endVote?: EndVote | null;
   lastVoteEndedAt?: number;
+  gamesPlayed?: number;
   emptySince: number | null;
   /** Recent chat, oldest first. Optional so rooms saved before chat existed still load. */
   chat?: ChatMessage[];
@@ -348,6 +351,13 @@ export class Room extends DurableObject<Env> {
         };
         break;
 
+      case 'room:resetScores':
+        this.requireHost(me);
+        if (room.status === 'playing') throw new RoomError('game_in_progress', 'Reset scores between games');
+        for (const s of room.seats) s.wins = 0;
+        room.gamesPlayed = 0;
+        break;
+
       case 'room:lobby': {
         this.requireHost(me);
         if (room.status !== 'finished') throw new RoomError('game_in_progress', 'Finish the game first');
@@ -433,6 +443,10 @@ export class Room extends DurableObject<Env> {
       room.deadline = null;
       room.matchEndsAt = null;
       room.endVote = null;
+      // Scoreboard: every finished game counts, and the winner gets a win if still seated.
+      room.gamesPlayed = (room.gamesPlayed ?? 0) + 1;
+      const winner = this.seat(state.phase.winnerId);
+      if (winner) winner.wins = (winner.wins ?? 0) + 1;
     } else if (turnKey(state) !== before) {
       this.resetDeadline();
     }
@@ -577,10 +591,12 @@ export class Room extends DurableObject<Env> {
         connected: connected.has(s.id),
         afk: s.afkStrikes >= AFK_STRIKES,
         ready: !!s.ready,
+        wins: s.wins ?? 0,
       })),
       spectators: this.ctx.getWebSockets().filter((ws) => ws !== exclude && !this.attachment(ws).playerId).length,
       matchEndsAt: room.status === 'playing' ? (room.matchEndsAt ?? null) : null,
       endVote: room.endVote ?? null,
+      gamesPlayed: room.gamesPlayed ?? 0,
     };
   }
 

@@ -17,6 +17,7 @@ export type ClientMessage = { requestId?: string } & (
   | { type: 'game:callUno'; payload: Record<string, never> }
   | { type: 'game:catchUno'; payload: { targetId: string } }
   | { type: 'room:lobby'; payload: Record<string, never> }
+  | { type: 'room:resetScores'; payload: Record<string, never> }
   | { type: 'room:ready'; payload: { ready: boolean } }
   | { type: 'room:react'; payload: { emoji: Reaction } }
   | { type: 'game:endVote'; payload: { outcome: EndOutcome } }
@@ -47,6 +48,8 @@ export interface RoomPlayerView {
   afk: boolean;
   /** Ready for the next game. The host starts it, so their own flag is ignored. */
   ready: boolean;
+  /** Games won in this room. */
+  wins: number;
 }
 
 export interface RoomView {
@@ -61,6 +64,8 @@ export interface RoomView {
   matchEndsAt: number | null;
   /** A running vote to end the game early, if any. */
   endVote: EndVote | null;
+  /** Games finished in this room since it opened or the scores were reset. */
+  gamesPlayed: number;
 }
 
 /** "finish": score the game now (fewest cards wins). "cancel": no winner, back to the lobby. */

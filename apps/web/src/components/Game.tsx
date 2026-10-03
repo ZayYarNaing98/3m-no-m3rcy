@@ -4,6 +4,7 @@ import { navigate } from '../App';
 import { setSoundEnabled, soundEnabled } from '../sound';
 import { useGame } from '../store';
 import { useForceDark } from '../theme';
+import { leaderId, winsOf } from '../scoreboard';
 import { useTurnAlerts } from '../turnAlerts';
 import { Avatar } from './Avatar';
 import { Card, CardBack, COLOR_BG, COLOR_RING } from './Card';
@@ -515,6 +516,7 @@ function PokerTable({
 }) {
   const room = useGame((s) => s.room);
   const connected = new Map(room?.players.map((p) => [p.id, p.connected]) ?? []);
+  const leader = leaderId(room);
   const wide = useWide();
 
   // Measure the space the table gets and fit the oval into it.
@@ -605,6 +607,7 @@ function PokerTable({
                   catchable={canCatch && p.status === 'active' && p.cardCount === 1 && !p.calledUno}
                   onCatch={() => onCatch(p.id)}
                   onTap={onSeatTap && ((rect) => onSeatTap({ id: p.id, name: p.name, rect }))}
+                  leader={p.id === leader}
                   compact={compact}
                 />
               </div>
@@ -622,7 +625,7 @@ function PokerTable({
                     active={me.id === game.currentPlayerId && me.status === 'active'}
                     dimmed={me.status === 'eliminated'}
                   />
-                  <span className="text-sm font-bold">You</span>
+                  <span className="text-sm font-bold">You{me.id === leader && ' 👑'}</span>
                   <span className="text-xs text-slate-400">{me.cardCount} cards</span>
                 </div>
               </div>
@@ -682,6 +685,7 @@ function Seat({
   catchable,
   onCatch,
   onTap,
+  leader,
   compact,
 }: {
   player: PublicPlayer;
@@ -690,6 +694,8 @@ function Seat({
   catchable: boolean;
   onCatch: () => void;
   onTap?: (rect: DOMRect) => void;
+  /** Most wins in the room: wears a crown. */
+  leader?: boolean;
   /** Avatar with a count badge and a small name, for crowded phone tables. */
   compact?: boolean;
 }) {
@@ -701,6 +707,7 @@ function Seat({
       >
         <SeatTap name={p.name} onTap={onTap}>
           <Avatar name={p.name} size="sm" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
+          {leader && <Crown />}
           <span
             className={`absolute -right-2 -bottom-1 rounded-full px-1 text-[0.6rem] font-black ring-2 ring-slate-900 ${
               p.status !== 'active'
@@ -739,6 +746,7 @@ function Seat({
     >
       <SeatTap name={p.name} onTap={onTap}>
         <Avatar name={p.name} size="md" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
+        {leader && <Crown />}
       </SeatTap>
       <div
         className={`-mt-2 w-full rounded-lg px-2 pt-2.5 pb-1.5 text-center shadow-lg ring-1 ${
@@ -769,6 +777,19 @@ function Seat({
         </button>
       )}
     </div>
+  );
+}
+
+/** Sits on the avatar of the player with the most wins in the room. */
+function Crown() {
+  return (
+    <span
+      className="pointer-events-none absolute -top-2.5 left-1/2 -translate-x-1/2 -rotate-12 text-sm drop-shadow-[0_2px_3px_rgba(0,0,0,0.7)]"
+      title="Most wins"
+      aria-label="Most wins"
+    >
+      👑
+    </span>
   );
 }
 
@@ -1090,7 +1111,7 @@ function Sheet({
 }
 
 function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
-  const { send, leave, playerId } = useGame();
+  const { send, leave, playerId, room } = useGame();
   const seated = game.players.some((p) => p.id === playerId);
   const winnerId = game.phase.kind === 'roundOver' ? game.phase.winnerId : undefined;
   // Set when the match clock ran out: ranked by cards, then card points.
@@ -1116,6 +1137,8 @@ function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
             <span className="w-4 text-slate-400">{i + 1}</span>
             <Avatar name={game.players.find((p) => p.id === id)?.name ?? '?'} size="xs" />
             <span className="flex-1">{name(id)}</span>
+            {id === winnerId && <span className="animate-pop text-xs font-bold text-amber-300">+1 🏆</span>}
+            <span className="w-8 text-right text-xs text-slate-400 tabular-nums">🏆{winsOf(room, id)}</span>
             <span className="text-slate-400">
               {game.eliminationOrder.includes(id)
                 ? 'eliminated'
