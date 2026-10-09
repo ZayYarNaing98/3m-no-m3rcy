@@ -1,4 +1,4 @@
-import { CHAT_MAX_LENGTH, COLORS, MATCH_MINUTES_OPTIONS, REACTIONS, THROWABLES, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
+import { BOT_LEVELS, CHAT_MAX_LENGTH, COLORS, MATCH_MINUTES_OPTIONS, REACTIONS, THROWABLES, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
 import { z } from 'zod';
 
 const id = z.string().min(1).max(64);
@@ -18,6 +18,8 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   msg('room:rejoin', z.object({ playerToken: id })),
   msg('room:leave', empty),
   msg('room:kick', z.object({ playerId: id })),
+  msg('room:addBot', z.object({ level: z.enum(BOT_LEVELS) })),
+  msg('room:setBot', z.object({ playerId: id, level: z.enum(BOT_LEVELS) })),
   msg(
     'room:settings',
     z.object({

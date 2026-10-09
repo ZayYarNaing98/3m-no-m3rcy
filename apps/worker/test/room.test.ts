@@ -495,3 +495,61 @@ describe('spectators', () => {
     });
   });
 });
+
+describe('bots', () => {
+  it('lets the host add up to two bots, who are always ready', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const b = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    await b.request('room:join', { name: 'Ben' });
+    expect(await b.request('room:addBot', { level: 'easy' })).toMatchObject({ ok: false, error: { code: 'not_host' } });
+    expect((await a.request('room:addBot', { level: 'easy' })).ok).toBe(true);
+    expect((await a.request('room:addBot', { level: 'hard' })).ok).toBe(true);
+    expect(await a.request('room:addBot', { level: 'normal' })).toMatchObject({ ok: false, error: { code: 'too_many_bots' } });
+
+    const bots = a.latest('room:state')!.room.players.filter((p) => p.bot);
+    expect(bots.map((p) => p.bot)).toEqual(['easy', 'hard']);
+    expect(bots.every((p) => p.ready && p.connected && p.name.startsWith('🤖'))).toBe(true);
+    expect((await a.request('room:setBot', { playerId: bots[0]!.id, level: 'normal' })).ok).toBe(true);
+    expect((await a.request('room:kick', { playerId: bots[1]!.id })).ok).toBe(true);
+    expect(a.latest('room:state')!.room.players.filter((p) => p.bot).map((p) => p.bot)).toEqual(['normal']);
+  });
+
+  it('plays a bot turn on the alarm, and the bots go when the last person leaves', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    await a.request('room:addBot', { level: 'hard' });
+    expect((await a.request('game:start')).ok).toBe(true);
+
+    const stub = env.ROOMS.getByName(code);
+    type Rec = {
+      seats: { id: string; bot?: string }[];
+      game: { currentIndex: number; phase: { kind: string }; players: { id: string }[] };
+      botAt: number | null;
+      deadline: number;
+    };
+    const botId = await runInDurableObject(stub, (instance: Room) => {
+      const room = (instance as unknown as { room: Rec }).room;
+      const bot = room.seats.find((s) => s.bot)!;
+      // Hand the turn to the bot and make its move due now.
+      room.game.currentIndex = room.game.players.findIndex((p) => p.id === bot.id);
+      room.game.phase = { kind: 'awaitingPlay' };
+      room.botAt = Date.now() - 1;
+      room.deadline = Date.now() + 60_000;
+      return bot.id;
+    });
+    const from = a.msgs.length;
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    const moved = await a.waitFor(
+      (m): m is Extract<ServerMessage, { type: 'game:events' }> =>
+        m.type === 'game:events' && m.events.some((e) => 'playerId' in e && e.playerId === botId),
+      from,
+    );
+    expect(moved.events.length).toBeGreaterThan(0);
+
+    expect((await a.request('room:leave')).ok).toBe(true);
+    expect(a.latest('room:state')!.room).toMatchObject({ status: 'lobby', players: [] });
+  });
+});

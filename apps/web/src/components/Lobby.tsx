@@ -1,13 +1,15 @@
-import { MATCH_MINUTES_OPTIONS, MIN_PLAYERS, TURN_SECONDS_OPTIONS } from '@nomercy/engine';
+import { BOT_LEVELS, MATCH_MINUTES_OPTIONS, MAX_BOTS, MAX_PLAYERS, MIN_PLAYERS, TURN_SECONDS_OPTIONS, type BotLevel } from '@nomercy/engine';
 import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../App';
 import { useGame } from '../store';
 import { Avatar } from './Avatar';
 import { ChatButton, ChatPanel } from './Chat';
-import { leaderId } from '../scoreboard';
+import { isLeader } from '../scoreboard';
 import { TableFx } from './TableFx';
 import { ThemeToggle } from './ThemeToggle';
 import { seatRectOf, ThrowMenu, type ThrowTarget } from './ThrowMenu';
+
+const LEVEL_LABEL: Record<BotLevel, string> = { easy: 'Easy', normal: 'Normal', hard: 'Hard' };
 
 export function Lobby() {
   const { room, playerId, send, leave } = useGame();
@@ -15,13 +17,14 @@ export function Lobby() {
   const [throwTarget, setThrowTarget] = useState<ThrowTarget | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [editingName, setEditingName] = useState(false);
+  const [botLevel, setBotLevel] = useState<BotLevel>('normal');
   if (!room) return null;
   const isHost = room.hostId === playerId;
   const me = room.players.find((p) => p.id === playerId);
   const guests = room.players.filter((p) => p.id !== room.hostId);
   const readyCount = guests.filter((p) => p.ready).length;
   const allReady = readyCount === guests.length;
-  const leader = leaderId(room);
+  const botCount = room.players.filter((p) => p.bot).length;
   const link = `${location.origin}/r/${room.code}`;
 
   async function copy() {
@@ -94,7 +97,7 @@ export function Lobby() {
                       ✏️
                     </button>
                   )}
-                  {p.id === leader && (
+                  {isLeader(room, p.id) && (
                     <span className="ml-1 shrink-0" title="Most wins" aria-label="Most wins">
                       👑
                     </span>
@@ -108,6 +111,21 @@ export function Lobby() {
               )}
               {p.id === room.hostId ? (
                 <span className="rounded-full bg-amber-400/20 px-2 text-xs text-amber-300 light:text-amber-700">host</span>
+              ) : p.bot && isHost ? (
+                <select
+                  className="rounded-full bg-sky-400/20 px-2 text-base text-sky-300 outline-none sm:text-xs light:text-sky-700"
+                  value={p.bot}
+                  onChange={(e) => send('room:setBot', { playerId: p.id, level: e.target.value })}
+                  aria-label={`${p.name}'s level`}
+                >
+                  {BOT_LEVELS.map((l) => (
+                    <option key={l} value={l}>
+                      {LEVEL_LABEL[l]}
+                    </option>
+                  ))}
+                </select>
+              ) : p.bot ? (
+                <span className="rounded-full bg-sky-400/20 px-2 text-xs text-sky-300 light:text-sky-700">{LEVEL_LABEL[p.bot]}</span>
               ) : p.ready ? (
                 <span className="rounded-full bg-emerald-400/20 px-2 text-xs text-emerald-300 light:text-emerald-700">ready</span>
               ) : (
@@ -115,12 +133,38 @@ export function Lobby() {
               )}
               {isHost && p.id !== playerId && (
                 <button className="text-xs text-red-400 light:text-red-600 hover:underline" onClick={() => send('room:kick', { playerId: p.id })}>
-                  Kick
+                  {p.bot ? 'Remove' : 'Kick'}
                 </button>
               )}
             </li>
           ))}
         </ul>
+        {isHost && (
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              className="btn-secondary flex-1 py-2 text-sm"
+              disabled={botCount >= MAX_BOTS || room.players.length >= MAX_PLAYERS}
+              onClick={() => send('room:addBot', { level: botLevel })}
+            >
+              🤖 {botCount >= MAX_BOTS ? `Bots full (${MAX_BOTS}/${MAX_BOTS})` : 'Add bot'}
+            </button>
+            <div role="radiogroup" aria-label="Bot level" className="inline-flex rounded-full bg-surface-2 p-0.5 text-xs">
+              {BOT_LEVELS.map((l) => (
+                <button
+                  key={l}
+                  role="radio"
+                  aria-checked={botLevel === l}
+                  className={`rounded-full px-2.5 py-1.5 font-semibold transition ${
+                    botLevel === l ? 'bg-raised text-fg shadow-sm ring-1 ring-line' : 'text-muted hover:text-fg'
+                  }`}
+                  onClick={() => setBotLevel(l)}
+                >
+                  {LEVEL_LABEL[l]}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {room.players.length > 1 && (
           <p className="mt-2 text-center text-xs text-subtle">Tap someone's avatar to throw something at them 🥾🍅</p>
         )}

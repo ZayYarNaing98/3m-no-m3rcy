@@ -42,7 +42,7 @@ export function TablePreview() {
         hostId: 'p0',
         status: 'playing',
         settings: { turnSeconds: 30, matchMinutes: 0 },
-        players: names.slice(0, n).map((name, i) => ({ id: `p${i}`, name, connected: i !== 3, afk: false, ready: false, wins: i === 1 ? 2 : 0 })),
+        players: names.slice(0, n).map((name, i) => ({ id: `p${i}`, name, connected: i !== 3, afk: false, ready: false, wins: i === 1 ? 2 : 0, bot: null })),
         spectators: Number(params.get('watching')) || 0,
         matchEndsAt: null,
         endVote: null,

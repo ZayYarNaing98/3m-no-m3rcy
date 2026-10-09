@@ -2,6 +2,15 @@ import { DurableObject } from 'cloudflare:workers';
 import {
   AFK_STRIKES,
   applyAction,
+  botAction,
+  BOT_CATCH,
+  BOT_THINK,
+  BOT_UNO_CHANCE,
+  type BotLevel,
+  drawValue,
+  MAX_BOTS,
+  type Reaction,
+  type Throwable,
   endEarly,
   createGame,
   current,
@@ -35,6 +44,11 @@ const EMPTY_ROOM_TTL_MS = 10 * 60_000;
 /** Turn length for players marked AFK. */
 const AFK_TURN_MS = 3_000;
 const RATE_LIMIT_PER_SECOND = 10;
+const BOT_NAMES = ['🤖 Aye', '🤖 Mya', '🤖 Hla', '🤖 Zaw'];
+/** What a bot throws back when it's annoyed. */
+const BOT_AMMO: Throwable[] = ['tomato', 'egg', 'shoe', 'pie', 'poop', 'angryShoe', 'angryStick', 'stone', 'sock', 'bomb'];
+/** Minimum gap between one bot's emotes, so it never floods the table. */
+const BOT_EMOTE_GAP_MS = 4_000;
 
 interface Seat {
   id: string;
@@ -47,6 +61,8 @@ interface Seat {
   ready?: boolean;
   /** Games won in this room; optional so older rooms still load. */
   wins?: number;
+  /** Set for a computer player: its difficulty. */
+  bot?: BotLevel;
 }
 
 interface RoomRecord {
@@ -67,6 +83,13 @@ interface RoomRecord {
   emptySince: number | null;
   /** Recent chat, oldest first. Optional so rooms saved before chat existed still load. */
   chat?: ChatMessage[];
+  /** When the bot whose turn it is makes its move. */
+  botAt?: number | null;
+  /**
+   * A bot's try at catching a player who forgot UNO; `at` is null once the bot decided to let it go,
+   * so it only rolls once per chance.
+   */
+  botCatch?: { botId: string; targetId: string; at: number | null } | null;
 }
 
 interface SocketAttachment {
@@ -89,6 +112,9 @@ export class Room extends DurableObject<Env> {
   private lastReaction = new Map<string, number>();
   private lastThrow = new Map<string, number>();
   private lastChat = new Map<string, number>();
+  /** Who last played a draw card, for a bot to blame when it takes a stack. */
+  private lastDrawBy: string | null = null;
+  private lastBotEmote = new Map<string, number>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -186,11 +212,17 @@ export class Room extends DurableObject<Env> {
     if (room.status === 'playing' && room.game && room.matchEndsAt && now >= room.matchEndsAt - 50) {
       const { state, events } = endEarly(room.game, 'time');
       this.commit(state, events);
+    } else if (room.status === 'playing' && room.botAt && now >= room.botAt - 50 && this.connectedIds().size > 0) {
+      this.botMove();
     } else if (room.status === 'playing' && room.game && room.deadline !== null && now >= room.deadline - 50) {
       const seat = this.seat(current(room.game).id);
       if (seat) seat.afkStrikes++;
       this.runAction(current(room.game).id, { type: 'timeout' });
     }
+    if (room.status === 'playing' && room.botCatch?.at && now >= room.botCatch.at - 50 && this.connectedIds().size > 0) {
+      this.botCatchUno();
+    }
+    this.save();
 
     if (this.connectedIds().size === 0 && room.emptySince !== null && now >= room.emptySince + EMPTY_ROOM_TTL_MS) {
       await this.ctx.storage.deleteAll();
@@ -267,6 +299,38 @@ export class Room extends DurableObject<Env> {
         break;
       }
 
+      case 'room:addBot': {
+        this.requireHost(me);
+        if (room.status !== 'lobby') throw new RoomError('game_in_progress', 'Add bots in the lobby');
+        const seated = this.seated();
+        if (seated.length >= MAX_PLAYERS) throw new RoomError('room_full', 'This room is full');
+        if (seated.filter((s) => s.bot).length >= MAX_BOTS) {
+          throw new RoomError('too_many_bots', `A room can have up to ${MAX_BOTS} bots`);
+        }
+        const taken = new Set(seated.map((s) => s.name.toLowerCase()));
+        const name = BOT_NAMES.find((n) => !taken.has(n.toLowerCase())) ?? `🤖 Bot ${seated.length + 1}`;
+        room.seats.push({
+          id: crypto.randomUUID(),
+          token: crypto.randomUUID(),
+          name,
+          joinedAt: Date.now(),
+          afkStrikes: 0,
+          left: false,
+          ready: true,
+          bot: msg.payload.level,
+        });
+        break;
+      }
+
+      case 'room:setBot': {
+        this.requireHost(me);
+        if (room.status !== 'lobby') throw new RoomError('game_in_progress', 'Change bots in the lobby');
+        const seat = this.requireSeat(msg.payload.playerId);
+        if (!seat.bot) throw new RoomError('bad_target', 'That player is not a bot');
+        seat.bot = msg.payload.level;
+        break;
+      }
+
       case 'room:react': {
         const seat = this.requireSeat(me);
         const now = Date.now();
@@ -326,6 +390,7 @@ export class Room extends DurableObject<Env> {
         this.lastThrow.set(seat.id, now);
         const out: ServerMessage = { type: 'throw', fromId: seat.id, targetId: target.id, item: msg.payload.item };
         for (const ws of this.ctx.getWebSockets()) this.send(ws, out);
+        if (target.bot) this.botAnnoyed(target, seat.id, 0.6);
         // Like reactions, throws are fire-and-forget.
         return;
       }
@@ -397,8 +462,8 @@ export class Room extends DurableObject<Env> {
         );
         for (const s of seated) {
           s.afkStrikes = 0;
-          // Everyone readies up again before the next game.
-          s.ready = false;
+          // Everyone readies up again before the next game; bots are always ready.
+          s.ready = !!s.bot;
         }
         room.status = 'playing';
         room.stateVersion++;
@@ -406,6 +471,7 @@ export class Room extends DurableObject<Env> {
         room.matchEndsAt = minutes > 0 ? Date.now() + minutes * 60_000 : null;
         room.endVote = null;
         this.resetDeadline();
+        this.planBots(true);
         this.broadcastRoom();
         this.broadcastGame([]);
         break;
@@ -460,16 +526,18 @@ export class Room extends DurableObject<Env> {
     } else if (turnKey(state) !== before) {
       this.resetDeadline();
     }
+    this.planBots(turnKey(state) !== before);
+    this.botReactions(events);
     this.save();
     this.broadcastGame(events);
     if (room.status === 'finished') this.broadcastRoom();
   }
 
-  /** Players who may vote to end the game: still in it and still seated. */
+  /** Players who may vote to end the game: people still in it and still seated (bots don't vote). */
   private voters(): string[] {
     const game = this.requireRoom().game;
     if (!game) return [];
-    return game.players.filter((p) => p.status === 'active' && this.seat(p.id)).map((p) => p.id);
+    return game.players.filter((p) => p.status === 'active' && this.seat(p.id) && !this.seat(p.id)?.bot).map((p) => p.id);
   }
 
   /** Passes the vote on a strict majority of players still in, or drops it once that can't happen. */
@@ -517,6 +585,8 @@ export class Room extends DurableObject<Env> {
     room.deadline = null;
     room.matchEndsAt = null;
     room.endVote = null;
+    room.botAt = null;
+    room.botCatch = null;
     room.status = 'lobby';
     room.stateVersion++;
   }
@@ -533,6 +603,11 @@ export class Room extends DurableObject<Env> {
       room.seats = room.seats.filter((s) => s.id !== seat.id);
     }
     if (room.hostId === seat.id) this.transferHost();
+    // Bots don't play on their own: once the last person leaves, the bots go too.
+    if (!this.seated().some((s) => !s.bot)) {
+      if (room.status !== 'lobby') this.backToLobby();
+      room.seats = room.seats.filter((s) => !s.bot);
+    }
   }
 
   private async onDisconnect(ws: WebSocket): Promise<void> {
@@ -552,7 +627,7 @@ export class Room extends DurableObject<Env> {
     const room = this.requireRoom();
     const connected = this.connectedIds(closing);
     const others = this.seated()
-      .filter((s) => s.id !== room.hostId)
+      .filter((s) => s.id !== room.hostId && !s.bot)
       .sort((a, b) => a.joinedAt - b.joinedAt);
     const next = others.find((s) => connected.has(s.id));
     if (next) room.hostId = next.id;
@@ -580,9 +655,145 @@ export class Room extends DurableObject<Env> {
       times.push(room.emptySince + EMPTY_ROOM_TTL_MS);
     } else {
       room.emptySince = null;
+      // Bots only play while someone is watching.
+      if (room.status === 'playing' && room.botAt) times.push(room.botAt);
+      if (room.status === 'playing' && room.botCatch?.at) times.push(room.botCatch.at);
     }
     if (times.length === 0) await this.ctx.storage.deleteAlarm();
     else await this.ctx.storage.setAlarm(Math.min(...times));
+  }
+
+  // --- Bots -------------------------------------------------------------------
+
+  /** Times the next bot move and decides whether a bot will catch a player who forgot UNO. */
+  private planBots(turnChanged: boolean): void {
+    const room = this.requireRoom();
+    const game = room.game;
+    if (room.status !== 'playing' || !game) {
+      room.botAt = null;
+      room.botCatch = null;
+      return;
+    }
+
+    const level = this.seat(current(game).id)?.bot;
+    if (!level) room.botAt = null;
+    else if (turnChanged || !room.botAt) {
+      const { base, spread } = BOT_THINK[level];
+      // Picking a colour or a swap right after its own card is quick, as is drawing again.
+      const quick = game.phase.kind === 'chooseColor' || game.phase.kind === 'chooseSwapTarget' || !turnChanged;
+      room.botAt = Date.now() + (quick ? 700 : base + Math.random() * spread);
+    }
+
+    if (room.botCatch && !this.forgotUno(room.botCatch.targetId)) room.botCatch = null;
+    if (room.botCatch) return;
+    const target = game.players.find((p) => !this.seat(p.id)?.bot && this.forgotUno(p.id));
+    const order: BotLevel[] = ['hard', 'normal', 'easy'];
+    const catcher = game.players
+      .filter((p) => p.status === 'active' && this.seat(p.id)?.bot)
+      .map((p) => this.seat(p.id) as Seat)
+      .sort((a, b) => order.indexOf(a.bot as BotLevel) - order.indexOf(b.bot as BotLevel))[0];
+    if (!target || !catcher) return;
+    const { chance, delayMs } = BOT_CATCH[catcher.bot as BotLevel];
+    room.botCatch = {
+      botId: catcher.id,
+      targetId: target.id,
+      at: Math.random() < chance ? Date.now() + delayMs : null,
+    };
+  }
+
+  private forgotUno(playerId: string): boolean {
+    const p = this.room?.game?.players.find((x) => x.id === playerId);
+    return !!p && p.status === 'active' && p.hand.length === 1 && !p.calledUno;
+  }
+
+  private botMove(): void {
+    const room = this.requireRoom();
+    room.botAt = null;
+    const game = room.game;
+    if (!game) return;
+    const seat = this.seat(current(game).id);
+    if (!seat?.bot) return;
+    const action = botAction(game, seat.id, seat.bot, Math.random);
+    if (!action) return;
+    try {
+      this.runAction(seat.id, action);
+    } catch (e) {
+      // Shouldn't happen, but a stuck bot would stall the table: let the timeout rules move it on.
+      console.error('bot move failed', e);
+      this.runAction(seat.id, { type: 'timeout' });
+    }
+    const me = room.game?.players.find((p) => p.id === seat.id);
+    if (room.status === 'playing' && me && this.forgotUno(me.id) && Math.random() < BOT_UNO_CHANCE[seat.bot]) {
+      this.runAction(seat.id, { type: 'callUno' });
+    }
+  }
+
+  private botCatchUno(): void {
+    const room = this.requireRoom();
+    const c = room.botCatch;
+    if (!c) return;
+    room.botCatch = { ...c, at: null };
+    const bot = room.game?.players.find((p) => p.id === c.botId);
+    if (bot?.status !== 'active' || !this.forgotUno(c.targetId)) return;
+    try {
+      this.runAction(c.botId, { type: 'catchUno', targetId: c.targetId });
+    } catch (e) {
+      console.error('bot catch failed', e);
+    }
+  }
+
+  /** Bots react to what just happened to them: a sulk, a gloat, or something thrown back. */
+  private botReactions(events: GameEvent[]): void {
+    for (const e of events) {
+      if (e.type === 'played' && drawValue(e.card) > 0) {
+        this.lastDrawBy = e.playerId;
+        const bot = this.seat(e.playerId);
+        if (bot?.bot && drawValue(e.card) >= 6 && Math.random() < 0.4) this.botEmote(bot, { emoji: '😈' });
+      } else if (e.type === 'drew' && e.count >= 4) {
+        const bot = this.seat(e.playerId);
+        if (bot?.bot && this.lastDrawBy && this.lastDrawBy !== bot.id) this.botAnnoyed(bot, this.lastDrawBy, 0.5);
+      } else if (e.type === 'unoCaught') {
+        const bot = this.seat(e.playerId);
+        if (bot?.bot) this.botAnnoyed(bot, e.byId, 0.7);
+      } else if (e.type === 'handsSwapped') {
+        const bot = this.seat(e.b);
+        if (bot?.bot) this.botAnnoyed(bot, e.a, 0.5);
+      } else if (e.type === 'won') {
+        const bot = this.seat(e.playerId);
+        if (bot?.bot) this.botEmote(bot, { emoji: Math.random() < 0.5 ? '😎' : '😈' });
+      }
+    }
+  }
+
+  /** A bot hit by someone: sometimes throws something back, otherwise sometimes sulks. */
+  private botAnnoyed(bot: Seat, byId: string, chance: number): void {
+    if (byId === bot.id || !this.seat(byId)) return;
+    if (Math.random() < chance) {
+      const item = BOT_AMMO[Math.floor(Math.random() * BOT_AMMO.length)] as Throwable;
+      this.botEmote(bot, { targetId: byId, item });
+    } else if (Math.random() < 0.5) {
+      const sulks: Reaction[] = ['😡', '🤬', '😭', '😱'];
+      this.botEmote(bot, { emoji: sulks[Math.floor(Math.random() * sulks.length)] as Reaction });
+    }
+  }
+
+  /** Sends a bot's throw or reaction after a short, human-looking pause. */
+  private botEmote(bot: Seat, what: { emoji: Reaction } | { targetId: string; item: Throwable }): void {
+    const now = Date.now();
+    if (now - (this.lastBotEmote.get(bot.id) ?? 0) < BOT_EMOTE_GAP_MS) return;
+    this.lastBotEmote.set(bot.id, now);
+    setTimeout(
+      () => {
+        if (!this.seat(bot.id)) return;
+        const msg: ServerMessage =
+          'emoji' in what
+            ? { type: 'reaction', playerId: bot.id, emoji: what.emoji }
+            : { type: 'throw', fromId: bot.id, targetId: what.targetId, item: what.item };
+        if ('targetId' in what && !this.seat(what.targetId)) return;
+        for (const ws of this.ctx.getWebSockets()) this.send(ws, msg);
+      },
+      700 + Math.random() * 900,
+    );
   }
 
   // --- Views and sending ------------------------------------------------------
@@ -598,10 +809,11 @@ export class Room extends DurableObject<Env> {
       players: this.seated().map((s) => ({
         id: s.id,
         name: s.name,
-        connected: connected.has(s.id),
+        connected: !!s.bot || connected.has(s.id),
         afk: s.afkStrikes >= AFK_STRIKES,
         ready: !!s.ready,
         wins: s.wins ?? 0,
+        bot: s.bot ?? null,
       })),
       spectators: this.ctx.getWebSockets().filter((ws) => ws !== exclude && !this.attachment(ws).playerId).length,
       matchEndsAt: room.status === 'playing' ? (room.matchEndsAt ?? null) : null,

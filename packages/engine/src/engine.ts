@@ -356,7 +356,7 @@ function drawUntilPlayable(ctx: Ctx): void {
       break;
     }
   }
-  if (p.hand.length > 2) p.calledUno = false;
+  if (p.hand.length > 1) p.calledUno = false;
   events.push({ type: 'drew', playerId: p.id, count });
   checkMercy(ctx);
   if (s.phase.kind === 'roundOver') return;
@@ -415,7 +415,7 @@ function roulette(ctx: Ctx, color: Color): void {
     // Wild cards have no colour, so they never stop the roulette.
     if (c.color === color) break;
   }
-  if (p.hand.length > 2) p.calledUno = false;
+  if (p.hand.length > 1) p.calledUno = false;
   events.push({ type: 'rouletteFlip', playerId: p.id, color, count: flipped.length, cards: flipped });
   checkMercy(ctx);
   // The roulette victim loses their turn.
@@ -423,7 +423,7 @@ function roulette(ctx: Ctx, color: Color): void {
 }
 
 function callUno(ctx: Ctx, p: Player): void {
-  if (p.hand.length > 2) throw new EngineError('too_many_cards', 'Call UNO with two cards or fewer');
+  if (p.hand.length !== 1) throw new EngineError('too_many_cards', 'Call UNO when you have one card left');
   p.calledUno = true;
   ctx.events.push({ type: 'unoCalled', playerId: p.id });
 }
@@ -560,7 +560,7 @@ function giveCards(ctx: Ctx, p: Player, n: number): number {
     p.hand.push(c);
     count++;
   }
-  if (p.hand.length > 2) p.calledUno = false;
+  if (p.hand.length > 1) p.calledUno = false;
   ctx.events.push({ type: 'drew', playerId: p.id, count });
   return count;
 }

@@ -406,9 +406,17 @@ describe('UNO call', () => {
       hands: [[[R, 'number', 3], [R, 'number', 4]], [[Y, 'number', 1]]],
       top: [R, 'number', 5],
     });
-    s = applyAction(s, 'p0', { type: 'callUno' }).state;
     s = applyAction(s, 'p0', { type: 'play', cardId: cardId(s, 0, 'number', R, 3) }).state;
+    s = applyAction(s, 'p0', { type: 'callUno' }).state;
     expectCode(() => applyAction(s, 'p1', { type: 'catchUno', targetId: 'p0' }), 'not_catchable');
+  });
+
+  it('UNO can only be called with one card left', () => {
+    const s: GameState = makeState({
+      hands: [[[R, 'number', 3], [R, 'number', 4]], [[Y, 'number', 1]]],
+      top: [R, 'number', 5],
+    });
+    expectCode(() => applyAction(s, 'p0', { type: 'callUno' }), 'too_many_cards');
   });
 });
 

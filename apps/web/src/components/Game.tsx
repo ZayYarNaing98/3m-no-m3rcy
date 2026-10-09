@@ -4,7 +4,7 @@ import { navigate } from '../App';
 import { setSoundEnabled, soundEnabled } from '../sound';
 import { useGame } from '../store';
 import { useForceDark } from '../theme';
-import { leaderId, winsOf } from '../scoreboard';
+import { isLeader, winsOf } from '../scoreboard';
 import { useTurnAlerts } from '../turnAlerts';
 import { Avatar } from './Avatar';
 import { Card, CardBack, COLOR_BG, COLOR_RING } from './Card';
@@ -516,7 +516,6 @@ function PokerTable({
 }) {
   const room = useGame((s) => s.room);
   const connected = new Map(room?.players.map((p) => [p.id, p.connected]) ?? []);
-  const leader = leaderId(room);
   const wide = useWide();
 
   // Measure the space the table gets and fit the oval into it.
@@ -607,7 +606,7 @@ function PokerTable({
                   catchable={canCatch && p.status === 'active' && p.cardCount === 1 && !p.calledUno}
                   onCatch={() => onCatch(p.id)}
                   onTap={onSeatTap && ((rect) => onSeatTap({ id: p.id, name: p.name, rect }))}
-                  leader={p.id === leader}
+                  leader={isLeader(room, p.id)}
                   compact={compact}
                 />
               </div>
@@ -625,7 +624,7 @@ function PokerTable({
                     active={me.id === game.currentPlayerId && me.status === 'active'}
                     dimmed={me.status === 'eliminated'}
                   />
-                  <span className="text-sm font-bold">You{me.id === leader && ' 👑'}</span>
+                  <span className="text-sm font-bold">You{isLeader(room, me.id) && ' 👑'}</span>
                   <span className="text-xs text-slate-400">{me.cardCount} cards</span>
                 </div>
               </div>
@@ -727,7 +726,7 @@ function Seat({
         >
           {p.name}
         </div>
-        {p.status === 'active' && p.calledUno && p.cardCount <= 2 && (
+        {p.status === 'active' && p.calledUno && p.cardCount === 1 && (
           <div className="text-[0.6rem] font-black text-yellow-300">UNO!</div>
         )}
         {catchable && (
@@ -758,7 +757,7 @@ function Seat({
           <>
             <div className="flex items-center justify-center gap-1 text-[0.7rem] text-slate-300">
               <span>{p.cardCount} cards</span>
-              {p.calledUno && p.cardCount <= 2 && <span className="font-black text-yellow-300">UNO!</span>}
+              {p.calledUno && p.cardCount === 1 && <span className="font-black text-yellow-300">UNO!</span>}
             </div>
             <MercyBar count={p.cardCount} />
           </>
@@ -971,7 +970,7 @@ function MyHand({
   const phase = game.phase;
   const stacked = myTurn && phase.kind === 'respondToStack';
   const drawn = phase.kind === 'drawingUntilPlayable' ? phase.drawnCardId : undefined;
-  const canUno = game.hand.length <= 2 && !me.calledUno;
+  const canUno = game.hand.length === 1 && !me.calledUno;
   const hand = sortHand(game.hand);
 
   // Cards that weren't in the hand last render get a deal-in animation.
