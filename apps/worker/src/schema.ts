@@ -43,6 +43,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   msg('game:catchUno', z.object({ targetId: id })),
   msg('room:lobby', empty),
   msg('room:resetScores', empty),
+  msg('room:public', z.object({ public: z.boolean() })),
   msg('room:ready', z.object({ ready: z.boolean() })),
   msg('room:react', z.object({ emoji: z.enum(REACTIONS) })),
   msg('game:endVote', z.object({ outcome: z.enum(['finish', 'cancel']) })),

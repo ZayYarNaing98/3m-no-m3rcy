@@ -1,12 +1,9 @@
+import { newRoomCode } from './matchmaker';
+
+export { Matchmaker } from './matchmaker';
 export { Room } from './room';
 
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/;
-
-function newRoomCode(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(6));
-  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
-}
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -18,6 +15,16 @@ export default {
         if (await env.ROOMS.getByName(code).create(code)) return Response.json({ code });
       }
       return Response.json({ error: 'Could not allocate a room code' }, { status: 503 });
+    }
+
+    if (url.pathname === '/api/quickplay' && request.method === 'POST') {
+      const code = await env.MATCHMAKER.getByName('global').quickPlay();
+      if (code) return Response.json({ code });
+      return Response.json({ error: 'Could not find or make a room' }, { status: 503 });
+    }
+
+    if (url.pathname === '/api/open-rooms' && request.method === 'GET') {
+      return Response.json({ rooms: await env.MATCHMAKER.getByName('global').list() });
     }
 
     const match = url.pathname.match(/^\/api\/rooms\/([^/]+)(\/ws)?$/);

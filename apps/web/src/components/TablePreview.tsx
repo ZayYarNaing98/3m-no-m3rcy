@@ -47,6 +47,8 @@ export function TablePreview() {
         matchEndsAt: null,
         endVote: null,
         gamesPlayed: 3,
+        public: false,
+        autoBotAt: null,
       },
       log: ['Seint played red 4', 'zay drew 2', 'Mya played red Skip'],
     });

@@ -553,3 +553,59 @@ describe('bots', () => {
     expect(a.latest('room:state')!.room).toMatchObject({ status: 'lobby', players: [] });
   });
 });
+
+describe('quick play and public rooms', () => {
+  const openRooms = async () =>
+    ((await (await exports.default.fetch(`${BASE}/api/open-rooms`)).json()) as { rooms: { code: string; host: string; players: number }[] })
+      .rooms;
+  const quickPlay = async () => {
+    const res = await exports.default.fetch(`${BASE}/api/quickplay`, { method: 'POST' });
+    expect(res.status).toBe(200);
+    return ((await res.json()) as { code: string }).code;
+  };
+
+  it('puts Quick play players together and lists public rooms until the game starts', async () => {
+    const code = await quickPlay();
+    const a = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    expect(a.latest('room:state')!.room.public).toBe(true);
+    expect(await openRooms()).toContainEqual(expect.objectContaining({ code, host: 'Ana', players: 1 }));
+
+    // The next Quick play player lands in the same room instead of a new one.
+    expect(await quickPlay()).toBe(code);
+
+    // Private rooms stay off the list until the host makes them public.
+    const priv = await createRoom();
+    const c = await connect(priv);
+    await c.request('room:join', { name: 'Cy' });
+    expect((await openRooms()).map((r) => r.code)).not.toContain(priv);
+    expect((await c.request('room:public', { public: true })).ok).toBe(true);
+    expect((await openRooms()).map((r) => r.code)).toContain(priv);
+
+    const b = await connect(code);
+    await b.request('room:join', { name: 'Ben' });
+    await b.request('room:ready', { ready: true });
+    expect((await a.request('game:start')).ok).toBe(true);
+    expect((await openRooms()).map((r) => r.code)).not.toContain(code);
+    expect((await c.request('room:public', { public: false })).ok).toBe(true);
+    expect((await openRooms()).map((r) => r.code)).not.toContain(priv);
+  });
+
+  it('adds a bot to a Quick play room nobody else has joined', async () => {
+    const code = await quickPlay();
+    const a = await connect(code);
+    await a.request('room:join', { name: 'Solo' });
+    expect(a.latest('room:state')!.room.autoBotAt).toBeGreaterThan(Date.now());
+
+    const stub = env.ROOMS.getByName(code);
+    await runInDurableObject(stub, (instance: Room) => {
+      (instance as unknown as { room: { autoBotAt: number } }).room.autoBotAt = Date.now() - 1;
+    });
+    const from = a.msgs.length;
+    expect(await runDurableObjectAlarm(stub)).toBe(true);
+    await a.waitFor((m) => m.type === 'notice', from);
+    const room = a.latest('room:state')!.room;
+    expect(room.players.filter((p) => p.bot)).toHaveLength(1);
+    expect(room.autoBotAt).toBeNull();
+  });
+});

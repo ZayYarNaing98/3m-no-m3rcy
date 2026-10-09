@@ -1,6 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
   AFK_STRIKES,
+  AUTO_BOT_MS,
   applyAction,
   botAction,
   BOT_CATCH,
@@ -90,6 +91,13 @@ interface RoomRecord {
    * so it only rolls once per chance.
    */
   botCatch?: { botId: string; targetId: string; at: number | null } | null;
+  /** Listed for Quick play and the open rooms list. */
+  public?: boolean;
+  /** Made by Quick play: a lone player gets a bot after a short wait. */
+  quick?: boolean;
+  autoBotAt?: number | null;
+  /** The auto-bot only joins once per room. */
+  autoBotDone?: boolean;
 }
 
 interface SocketAttachment {
@@ -115,6 +123,8 @@ export class Room extends DurableObject<Env> {
   /** Who last played a draw card, for a bot to blame when it takes a stack. */
   private lastDrawBy: string | null = null;
   private lastBotEmote = new Map<string, number>();
+  /** The listing last sent to the matchmaker, to skip repeats. */
+  private lastListing: string | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -128,7 +138,7 @@ export class Room extends DurableObject<Env> {
   // --- RPC from the entry Worker -------------------------------------------
 
   /** Claims this room code. Returns false if the code is already in use. */
-  async create(code: string): Promise<boolean> {
+  async create(code: string, opts: { public?: boolean; quick?: boolean } = {}): Promise<boolean> {
     if (this.room) return false;
     this.room = {
       code,
@@ -140,6 +150,8 @@ export class Room extends DurableObject<Env> {
       stateVersion: 0,
       deadline: null,
       emptySince: Date.now(),
+      public: !!opts.public,
+      quick: !!opts.quick,
     };
     this.save();
     await this.scheduleAlarm();
@@ -163,6 +175,7 @@ export class Room extends DurableObject<Env> {
     // Everyone gets the new room view, so the watcher count stays current.
     this.broadcastRoom();
     if (this.room.game) this.sendGame(server, null);
+    await this.syncListing();
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -222,14 +235,17 @@ export class Room extends DurableObject<Env> {
     if (room.status === 'playing' && room.botCatch?.at && now >= room.botCatch.at - 50 && this.connectedIds().size > 0) {
       this.botCatchUno();
     }
+    if (room.autoBotAt && now >= room.autoBotAt - 50) this.autoBot();
     this.save();
 
     if (this.connectedIds().size === 0 && room.emptySince !== null && now >= room.emptySince + EMPTY_ROOM_TTL_MS) {
+      await this.env.MATCHMAKER.getByName('global').remove(room.code);
       await this.ctx.storage.deleteAll();
       this.room = null;
       return;
     }
     await this.scheduleAlarm();
+    await this.syncListing();
   }
 
   // --- Message handling ------------------------------------------------------
@@ -307,19 +323,7 @@ export class Room extends DurableObject<Env> {
         if (seated.filter((s) => s.bot).length >= MAX_BOTS) {
           throw new RoomError('too_many_bots', `A room can have up to ${MAX_BOTS} bots`);
         }
-        const taken = new Set(seated.map((s) => s.name.toLowerCase()));
-        const free = BOT_NAMES.filter((n) => !taken.has(n.toLowerCase()));
-        const name = free[Math.floor(Math.random() * free.length)] ?? `🤖 Bot ${seated.length + 1}`;
-        room.seats.push({
-          id: crypto.randomUUID(),
-          token: crypto.randomUUID(),
-          name,
-          joinedAt: Date.now(),
-          afkStrikes: 0,
-          left: false,
-          ready: true,
-          bot: msg.payload.level,
-        });
+        this.addBot(msg.payload.level);
         break;
       }
 
@@ -427,6 +431,12 @@ export class Room extends DurableObject<Env> {
         };
         break;
 
+      case 'room:public':
+        this.requireHost(me);
+        if (room.status === 'playing') throw new RoomError('game_in_progress', 'Change this between games');
+        room.public = msg.payload.public;
+        break;
+
       case 'room:resetScores':
         this.requireHost(me);
         if (room.status === 'playing') throw new RoomError('game_in_progress', 'Reset scores between games');
@@ -495,9 +505,11 @@ export class Room extends DurableObject<Env> {
       }
     }
 
+    this.planAutoBot();
     this.save();
     await this.scheduleAlarm();
     this.broadcastRoom();
+    await this.syncListing();
   }
 
   /** Applies an engine action, updates timers and status, and broadcasts. */
@@ -621,6 +633,7 @@ export class Room extends DurableObject<Env> {
     this.save();
     await this.scheduleAlarm();
     this.broadcastRoom(ws);
+    await this.syncListing(ws);
   }
 
   /** Passes host to the longest-seated connected player, if any. */
@@ -659,6 +672,7 @@ export class Room extends DurableObject<Env> {
       // Bots only play while someone is watching.
       if (room.status === 'playing' && room.botAt) times.push(room.botAt);
       if (room.status === 'playing' && room.botCatch?.at) times.push(room.botCatch.at);
+      if (room.autoBotAt) times.push(room.autoBotAt);
     }
     if (times.length === 0) await this.ctx.storage.deleteAlarm();
     else await this.ctx.storage.setAlarm(Math.min(...times));
@@ -797,6 +811,80 @@ export class Room extends DurableObject<Env> {
     );
   }
 
+  private addBot(level: BotLevel): Seat {
+    const seated = this.seated();
+    const taken = new Set(seated.map((s) => s.name.toLowerCase()));
+    const free = BOT_NAMES.filter((n) => !taken.has(n.toLowerCase()));
+    const seat: Seat = {
+      id: crypto.randomUUID(),
+      token: crypto.randomUUID(),
+      name: free[Math.floor(Math.random() * free.length)] ?? `🤖 Bot ${seated.length + 1}`,
+      joinedAt: Date.now(),
+      afkStrikes: 0,
+      left: false,
+      ready: true,
+      bot: level,
+    };
+    this.requireRoom().seats.push(seat);
+    return seat;
+  }
+
+  // --- Quick play and public rooms ------------------------------------------
+
+  /** A Quick play room with one person and no bots gets a bot after a short wait, once. */
+  private planAutoBot(): void {
+    const room = this.requireRoom();
+    const seated = this.seated();
+    const alone =
+      !!room.quick && !room.autoBotDone && room.status === 'lobby' && seated.length === 1 && !seated[0]?.bot;
+    if (!alone) room.autoBotAt = null;
+    else room.autoBotAt ??= Date.now() + AUTO_BOT_MS;
+  }
+
+  private autoBot(): void {
+    const room = this.requireRoom();
+    room.autoBotAt = null;
+    this.planAutoBot();
+    const stillAlone = room.autoBotAt !== null;
+    room.autoBotAt = null;
+    // Only while the player is here to see it; coming back re-arms the wait.
+    if (!stillAlone || this.connectedIds().size === 0) return;
+    room.autoBotDone = true;
+    const bot = this.addBot('normal');
+    const msg: ServerMessage = { type: 'notice', text: `🤖 Nobody's here yet, so ${bot.name} joined. Others can still join!` };
+    for (const ws of this.ctx.getWebSockets()) this.send(ws, msg);
+    this.broadcastRoom();
+  }
+
+  /** Keeps this room's entry in the matchmaker: listed while public, in the lobby, with a free seat and someone here. */
+  private async syncListing(closing?: WebSocket): Promise<void> {
+    const room = this.room;
+    if (!room) return;
+    const seated = this.seated();
+    const here = this.ctx.getWebSockets().some((ws) => ws !== closing);
+    const listed = !!room.public && room.status === 'lobby' && seated.length < MAX_PLAYERS && here;
+    const entry = listed
+      ? {
+          code: room.code,
+          host: this.seat(room.hostId)?.name ?? '',
+          players: seated.length,
+          bots: seated.filter((s) => s.bot).length,
+          quick: !!room.quick,
+        }
+      : null;
+    const key = JSON.stringify(entry);
+    if (key === this.lastListing) return;
+    const matchmaker = this.env.MATCHMAKER.getByName('global');
+    try {
+      if (entry) await matchmaker.upsert(entry);
+      else await matchmaker.remove(room.code);
+      this.lastListing = key;
+    } catch (e) {
+      // The listing is a convenience; the room works without it.
+      console.error('matchmaker sync failed', e);
+    }
+  }
+
   // --- Views and sending ------------------------------------------------------
 
   private roomView(exclude?: WebSocket): RoomView {
@@ -820,6 +908,8 @@ export class Room extends DurableObject<Env> {
       matchEndsAt: room.status === 'playing' ? (room.matchEndsAt ?? null) : null,
       endVote: room.endVote ?? null,
       gamesPlayed: room.gamesPlayed ?? 0,
+      public: !!room.public,
+      autoBotAt: room.autoBotAt ?? null,
     };
   }
 

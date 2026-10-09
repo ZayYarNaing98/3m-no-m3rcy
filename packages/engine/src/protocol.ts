@@ -22,6 +22,7 @@ export type ClientMessage = { requestId?: string } & (
   | { type: 'game:catchUno'; payload: { targetId: string } }
   | { type: 'room:lobby'; payload: Record<string, never> }
   | { type: 'room:resetScores'; payload: Record<string, never> }
+  | { type: 'room:public'; payload: { public: boolean } }
   | { type: 'room:ready'; payload: { ready: boolean } }
   | { type: 'room:react'; payload: { emoji: Reaction } }
   | { type: 'game:endVote'; payload: { outcome: EndOutcome } }
@@ -72,7 +73,24 @@ export interface RoomView {
   endVote: EndVote | null;
   /** Games finished in this room since it opened or the scores were reset. */
   gamesPlayed: number;
+  /** Listed for Quick play and the open rooms list. */
+  public: boolean;
+  /** When a bot joins a Quick play room nobody else has joined yet (server time in ms), or null. */
+  autoBotAt: number | null;
 }
+
+/** A public room waiting for players, as the home screen lists it. */
+export interface OpenRoom {
+  code: string;
+  /** The host's name. */
+  host: string;
+  players: number;
+  bots: number;
+  createdAt: number;
+}
+
+/** A Quick play room with one person in it gets a bot after this long. */
+export const AUTO_BOT_MS = 30_000;
 
 /** "finish": score the game now (fewest cards wins). "cancel": no winner, back to the lobby. */
 export type EndOutcome = 'finish' | 'cancel';

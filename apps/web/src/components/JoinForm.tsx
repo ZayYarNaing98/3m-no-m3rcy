@@ -1,6 +1,6 @@
 import type { RoomView } from '@nomercy/engine';
-import { useState } from 'react';
-import { NAME_KEY, useGame } from '../store';
+import { useEffect, useState } from 'react';
+import { NAME_KEY, takeAutoJoin, useGame } from '../store';
 import { HeroBanner } from './HeroBanner';
 
 export function JoinForm({ room }: { room: RoomView }) {
@@ -13,6 +13,14 @@ export function JoinForm({ room }: { room: RoomView }) {
     }
   });
   const [busy, setBusy] = useState(false);
+
+  // Arriving from Quick play or the open rooms list with a saved name: take a seat straight away.
+  useEffect(() => {
+    const n = name.trim();
+    if (!n || !takeAutoJoin(room.code)) return;
+    setBusy(true);
+    void join(n).finally(() => setBusy(false));
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

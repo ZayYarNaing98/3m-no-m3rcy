@@ -63,6 +63,27 @@ interface State {
 
 const seatKey = (code: string) => `nomercy:seat:${code}`;
 export const NAME_KEY = 'nomercy:name';
+const AUTO_JOIN_KEY = 'nomercy:autojoin';
+
+/** Marks a room to join without asking for a name again (Quick play, open rooms list). */
+export function setAutoJoin(code: string): void {
+  try {
+    sessionStorage.setItem(AUTO_JOIN_KEY, code);
+  } catch {
+    // Storage unavailable; the join form just asks as usual.
+  }
+}
+
+/** True once if this room was marked by setAutoJoin. */
+export function takeAutoJoin(code: string): boolean {
+  try {
+    const marked = sessionStorage.getItem(AUTO_JOIN_KEY) === code;
+    sessionStorage.removeItem(AUTO_JOIN_KEY);
+    return marked;
+  } catch {
+    return false;
+  }
+}
 
 export function loadSeat(code: string): SavedSeat | null {
   try {

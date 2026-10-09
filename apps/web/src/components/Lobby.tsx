@@ -50,6 +50,8 @@ export function Lobby() {
         </button>
       </header>
 
+      {room.public && room.players.length === 1 && <WaitingBanner autoBotAt={room.autoBotAt} />}
+
       <section>
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-muted">
@@ -189,6 +191,27 @@ export function Lobby() {
         )}
       </section>
 
+      <section className="flex items-center justify-between gap-3 rounded-2xl bg-surface px-4 py-3 light:shadow-md light:ring-1 light:ring-line">
+        <div>
+          <p className="text-sm">🌍 Public room</p>
+          <p className="text-xs text-subtle">
+            {room.public ? 'Anyone can join from Quick play and Open rooms' : 'Only people with the code or link can join'}
+          </p>
+        </div>
+        <button
+          role="switch"
+          aria-checked={room.public}
+          aria-label="Public room"
+          disabled={!isHost}
+          onClick={() => send('room:public', { public: !room.public })}
+          className={`relative h-7 w-12 shrink-0 rounded-full transition disabled:opacity-60 ${room.public ? 'bg-emerald-500' : 'bg-surface-3'}`}
+        >
+          <span
+            className={`absolute top-1 left-1 size-5 rounded-full bg-white shadow transition-transform ${room.public ? 'translate-x-5' : ''}`}
+          />
+        </button>
+      </section>
+
       <section className="flex items-center justify-between rounded-2xl bg-surface px-4 py-3 light:shadow-md light:ring-1 light:ring-line">
         <label htmlFor="turn" className="text-sm">
           Turn timer
@@ -317,5 +340,30 @@ function NameEditor({ current, onDone }: { current: string; onDone: () => void }
         ✓
       </button>
     </form>
+  );
+}
+
+/** Shown while you're alone in a public room: others can find it, and Quick play rooms get a bot soon. */
+function WaitingBanner({ autoBotAt }: { autoBotAt: number | null }) {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    if (!autoBotAt) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [autoBotAt]);
+  const left = autoBotAt ? Math.max(0, Math.ceil((autoBotAt - now) / 1000)) : null;
+
+  return (
+    <div className="-mb-2 flex items-center gap-3 rounded-2xl bg-sky-500/15 px-4 py-3 text-sm ring-1 ring-sky-400/30">
+      <span className="animate-pulse text-xl" aria-hidden="true">
+        🔎
+      </span>
+      <div>
+        <p className="font-semibold">Looking for players…</p>
+        <p className="text-xs text-muted">
+          {left !== null && left > 0 ? `A bot joins in ${left}s if nobody comes. ` : ''}You can also add bots and start now.
+        </p>
+      </div>
+    </div>
   );
 }
