@@ -493,7 +493,8 @@ function ThrownItem({ fx, onDone }: { fx: ThrowFx; onDone: () => void }) {
     const dx = cx - (from.left + from.width / 2);
     const dy = cy - (from.top + Math.min(from.height, 80) / 2);
     const lift = Math.min(160, 60 + Math.hypot(dx, dy) * 0.25);
-    const spin = info.impact === 'love' ? 30 : dx >= 0 ? 720 : -720;
+    // A photo just tilts on the way, so the face stays readable.
+    const spin = info.impact === 'love' ? 30 : info.image ? (dx >= 0 ? 20 : -20) : dx >= 0 ? 720 : -720;
     const anim = el.animate(
       [
         { transform: 'translate(0, 0) rotate(0deg) scale(0.8)' },
@@ -532,7 +533,11 @@ function ThrownItem({ fx, onDone }: { fx: ThrowFx; onDone: () => void }) {
           className="absolute -translate-x-1/2 -translate-y-1/2 text-4xl leading-none drop-shadow-[0_6px_10px_rgba(0,0,0,0.55)]"
           style={{ left: fx.from.left + fx.from.width / 2, top: fx.from.top + Math.min(fx.from.height, 80) / 2 }}
         >
-          {info.emoji}
+          {info.image ? (
+            <img src={info.image} alt="" className="size-16 rounded-2xl object-cover ring-2 ring-white" draggable={false} />
+          ) : (
+            info.emoji
+          )}
         </span>
       )}
       {landed &&

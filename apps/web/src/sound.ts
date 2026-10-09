@@ -426,7 +426,7 @@ export function playThrow(impact: 'bonk' | 'splat' | 'boom' | 'love', item: stri
   switch (impact) {
     case 'bonk': {
       // A hard knock, pitched by how heavy the thing is.
-      const base = { hammer: 140, brick: 150, stone: 200, glove: 180, banana: 320, sock: 360 }[item] ?? 260;
+      const base = { hammer: 140, brick: 150, stone: 200, glove: 180, angryShoe: 240, angryStick: 170, sock: 360 }[item] ?? 260;
       blip(c, { type: 'sine', from: base * 2, to: base * 0.6, start: hit, length: 0.16, peak: 0.5 });
       noiseBurst(c, { start: hit, length: 0.06, peak: 0.35, type: 'lowpass', from: 3000 });
       if (item === 'hammer') blip(c, { type: 'triangle', from: 1800, start: hit + 0.01, length: 0.25, peak: 0.08 });
@@ -434,7 +434,7 @@ export function playThrow(impact: 'bonk' | 'splat' | 'boom' | 'love', item: stri
     }
     case 'splat':
       // A wet, falling burst of noise.
-      noiseBurst(c, { start: hit, length: 0.2, peak: 0.4, type: 'lowpass', from: item === 'snowball' ? 3500 : 1800, to: 300 });
+      noiseBurst(c, { start: hit, length: 0.2, peak: 0.4, type: 'lowpass', from: 1800, to: 300 });
       blip(c, { type: 'sine', from: 220, to: 90, start: hit, length: 0.1, peak: 0.25 });
       if (item === 'egg') noiseBurst(c, { start: hit, length: 0.03, peak: 0.25, type: 'highpass', from: 3000 });
       break;

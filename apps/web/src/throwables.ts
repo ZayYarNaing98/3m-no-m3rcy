@@ -5,7 +5,16 @@ export type Impact = 'bonk' | 'splat' | 'boom' | 'love';
 /** How each throwable looks in the menu, in flight, and when it lands. */
 export const THROWABLE_INFO: Record<
   Throwable,
-  { emoji: string; label: string; impact: Impact; splat?: string; /** Leaves a stink cloud and a fly behind. */ stinky?: boolean }
+  {
+    emoji: string;
+    label: string;
+    impact: Impact;
+    splat?: string;
+    /** Leaves a stink cloud and a fly behind. */
+    stinky?: boolean;
+    /** A photo shown in the menu and in flight instead of the emoji; the emoji still bounces off on impact. */
+    image?: string;
+  }
 > = {
   shoe: { emoji: '🥾', label: 'Dirty shoe', impact: 'bonk', stinky: true },
   stone: { emoji: '🪨', label: 'Stone', impact: 'bonk' },
@@ -16,7 +25,7 @@ export const THROWABLE_INFO: Record<
   rose: { emoji: '🌹', label: 'Rose', impact: 'love' },
   poop: { emoji: '💩', label: 'Poop', impact: 'splat', splat: '💩' },
   pie: { emoji: '🥧', label: 'Pie', impact: 'splat', splat: '🥧' },
-  banana: { emoji: '🍌', label: 'Banana', impact: 'bonk' },
+  angryShoe: { emoji: '👟', label: 'Angry shoe', impact: 'bonk', image: '/emotes/angry-shoe.webp' },
   brick: { emoji: '🧱', label: 'Brick', impact: 'bonk' },
   firecracker: { emoji: '🧨', label: 'Firecracker', impact: 'boom' },
   kiss: { emoji: '💋', label: 'Kiss', impact: 'love' },
@@ -25,9 +34,14 @@ export const THROWABLE_INFO: Record<
   glove: { emoji: '🥊', label: 'Punch', impact: 'bonk' },
   pizza: { emoji: '🍕', label: 'Pizza', impact: 'splat', splat: '🍕' },
   chili: { emoji: '🌶️', label: 'Chili', impact: 'boom' },
-  snowball: { emoji: '❄️', label: 'Snowball', impact: 'splat', splat: '❄️' },
+  angryStick: { emoji: '🪵', label: 'Angry stick', impact: 'bonk', image: '/emotes/angry-stick.webp' },
   balloon: { emoji: '🎈', label: 'Balloon', impact: 'boom' },
 };
 
 /** How long a throw is in the air, in ms. */
 export const THROW_FLIGHT_MS = 700;
+
+// Fetch the photo emotes up front, so the first one thrown at you isn't blank in flight.
+if (typeof Image !== 'undefined') {
+  for (const info of Object.values(THROWABLE_INFO)) if (info.image) new Image().src = info.image;
+}
