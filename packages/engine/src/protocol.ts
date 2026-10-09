@@ -6,6 +6,7 @@ export type ClientMessage = { requestId?: string } & (
   | { type: 'room:join'; payload: { name: string } }
   | { type: 'room:rejoin'; payload: { playerToken: string } }
   | { type: 'room:leave'; payload: Record<string, never> }
+  | { type: 'room:rename'; payload: { name: string } }
   | { type: 'room:kick'; payload: { playerId: string } }
   | { type: 'room:settings'; payload: { turnSeconds?: number; matchMinutes?: number } }
   | { type: 'game:start'; payload: Record<string, never> }
@@ -107,7 +108,7 @@ export const MAX_PLAYERS = 10;
 export const DEFAULT_TURN_SECONDS = 30;
 export const TURN_SECONDS_OPTIONS = [15, 30, 45, 60, 90] as const;
 export const AFK_STRIKES = 3;
-export const MATCH_MINUTES_OPTIONS = [0, 5, 10, 15, 20] as const;
+export const MATCH_MINUTES_OPTIONS = [0, 5, 7, 8, 10, 15, 20] as const;
 
 /** Emoji players can send to the table. The server only relays these. */
 export const REACTIONS = [

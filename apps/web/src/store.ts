@@ -51,6 +51,7 @@ interface State {
   disconnect(): void;
   send(type: string, payload?: object): Promise<Ack>;
   join(name: string): Promise<Ack>;
+  rename(name: string): Promise<Ack>;
   leave(): Promise<void>;
   react(emoji: Reaction): Promise<Ack>;
   throwAt(targetId: string, item: Throwable): Promise<Ack>;
@@ -189,6 +190,21 @@ export const useGame = create<State>((set, get) => ({
   async join(name) {
     pendingName = name;
     return get().send('room:join', { name });
+  },
+
+  async rename(name) {
+    const ack = await get().send('room:rename', { name });
+    const code = get().code;
+    if (ack.ok) {
+      const seat = code ? loadSeat(code) : null;
+      if (code && seat) saveSeat(code, { ...seat, name: name.trim() });
+      try {
+        localStorage.setItem(NAME_KEY, name.trim());
+      } catch {
+        // Storage unavailable; the new name just won't be suggested next time.
+      }
+    }
+    return ack;
   },
 
   async leave() {

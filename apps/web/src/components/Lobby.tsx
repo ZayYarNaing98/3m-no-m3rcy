@@ -1,5 +1,5 @@
 import { MATCH_MINUTES_OPTIONS, MIN_PLAYERS, TURN_SECONDS_OPTIONS } from '@nomercy/engine';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../App';
 import { useGame } from '../store';
 import { Avatar } from './Avatar';
@@ -14,6 +14,7 @@ export function Lobby() {
   const [copied, setCopied] = useState(false);
   const [throwTarget, setThrowTarget] = useState<ThrowTarget | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [editingName, setEditingName] = useState(false);
   if (!room) return null;
   const isHost = room.hostId === playerId;
   const me = room.players.find((p) => p.id === playerId);
@@ -77,15 +78,29 @@ export function Lobby() {
                   <Avatar name={p.name} size="sm" online={p.connected} />
                 </button>
               )}
-              <span className="flex-1 truncate">
-                {p.name}
-                {p.id === playerId && <span className="text-subtle"> (you)</span>}
-                {p.id === leader && (
-                  <span className="ml-1" title="Most wins" aria-label="Most wins">
-                    👑
-                  </span>
-                )}
-              </span>
+              {p.id === playerId && editingName && room.status === 'lobby' ? (
+                <NameEditor current={p.name} onDone={() => setEditingName(false)} />
+              ) : (
+                <span className="flex min-w-0 flex-1 items-center">
+                  <span className="truncate">{p.name}</span>
+                  {p.id === playerId && <span className="shrink-0 whitespace-pre text-subtle"> (you)</span>}
+                  {p.id === playerId && room.status === 'lobby' && (
+                    <button
+                      className="ml-1 shrink-0 rounded-full px-1 text-sm opacity-70 transition hover:opacity-100 active:scale-90"
+                      onClick={() => setEditingName(true)}
+                      aria-label="Change your name"
+                      title="Change your name"
+                    >
+                      ✏️
+                    </button>
+                  )}
+                  {p.id === leader && (
+                    <span className="ml-1 shrink-0" title="Most wins" aria-label="Most wins">
+                      👑
+                    </span>
+                  )}
+                </span>
+              )}
               {room.gamesPlayed > 0 && (
                 <span className="text-xs font-semibold text-muted tabular-nums" title={`${p.wins} wins`}>
                   🏆{p.wins}
@@ -207,5 +222,56 @@ export function Lobby() {
       <TableFx />
       <ChatPanel />
     </div>
+  );
+}
+
+/** Inline editor for your own name: Enter or ✓ saves, Escape or tapping away cancels. */
+function NameEditor({ current, onDone }: { current: string; onDone: () => void }) {
+  const rename = useGame((s) => s.rename);
+  const [name, setName] = useState(current);
+  const [busy, setBusy] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      if (!form.current?.contains(e.target as Node)) onDone();
+    };
+    addEventListener('pointerdown', onDown);
+    return () => removeEventListener('pointerdown', onDown);
+  }, [onDone]);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const n = name.trim();
+    if (!n || n === current) return onDone();
+    setBusy(true);
+    const ack = await rename(n);
+    setBusy(false);
+    // On an error (name taken) the store shows a toast and the editor stays open to try again.
+    if (ack.ok) onDone();
+  }
+
+  return (
+    <form ref={form} onSubmit={submit} className="flex min-w-0 flex-1 items-center gap-1">
+      <input
+        className="min-w-0 flex-1 rounded-lg bg-surface-2 px-2 py-1 text-base outline-none ring-sky-400 focus:ring-2"
+        value={name}
+        maxLength={20}
+        autoFocus
+        enterKeyHint="done"
+        aria-label="Your name"
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => e.key === 'Escape' && onDone()}
+        onFocus={(e) => e.currentTarget.select()}
+      />
+      <button
+        type="submit"
+        disabled={busy || !name.trim()}
+        className="shrink-0 rounded-lg bg-emerald-600 px-2 py-1 text-sm font-bold text-white disabled:opacity-50"
+        aria-label="Save name"
+      >
+        ✓
+      </button>
+    </form>
   );
 }

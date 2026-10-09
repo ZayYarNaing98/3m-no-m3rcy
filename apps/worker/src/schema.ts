@@ -7,12 +7,14 @@ const empty = z.object({}).strict().default({});
 const version = z.number().int().nonnegative();
 
 export const NAME_MAX = 20;
+const name = z.string().trim().min(1, 'Enter a name').max(NAME_MAX, `Keep it under ${NAME_MAX} characters`);
 
 const msg = <T extends string, P extends z.ZodType>(type: T, payload: P) =>
   z.object({ type: z.literal(type), requestId: z.string().max(64).optional(), payload });
 
 export const clientMessageSchema = z.discriminatedUnion('type', [
-  msg('room:join', z.object({ name: z.string().trim().min(1).max(NAME_MAX) })),
+  msg('room:join', z.object({ name })),
+  msg('room:rename', z.object({ name })),
   msg('room:rejoin', z.object({ playerToken: id })),
   msg('room:leave', empty),
   msg('room:kick', z.object({ playerId: id })),

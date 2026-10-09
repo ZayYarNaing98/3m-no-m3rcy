@@ -244,6 +244,16 @@ export class Room extends DurableObject<Env> {
         break;
       }
 
+      case 'room:rename': {
+        const seat = this.requireSeat(me);
+        if (room.status !== 'lobby') throw new RoomError('game_in_progress', 'You can only change your name in the lobby');
+        const name = msg.payload.name;
+        const taken = this.seated().some((s) => s.id !== seat.id && s.name.toLowerCase() === name.toLowerCase());
+        if (taken) throw new RoomError('name_taken', `Someone here is already called ${name}`);
+        seat.name = name;
+        break;
+      }
+
       case 'room:kick': {
         this.requireHost(me);
         if (room.status === 'playing') throw new RoomError('game_in_progress', 'You can only kick in the lobby');

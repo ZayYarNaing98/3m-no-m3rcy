@@ -158,6 +158,22 @@ describe('room over WebSocket', () => {
     expect(reset.players.every((p) => p.wins === 0)).toBe(true);
   });
 
+  it('lets players rename themselves in the lobby only, with unique names', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const b = await connect(code);
+    await a.request('room:join', { name: 'Ana' });
+    await b.request('room:join', { name: 'Ben' });
+    expect(await b.request('room:rename', { name: ' ana ' })).toMatchObject({ ok: false, error: { code: 'name_taken' } });
+    expect((await b.request('room:rename', { name: '   ' })).ok).toBe(false);
+    expect((await b.request('room:rename', { name: ' Benny ' })).ok).toBe(true);
+    expect(a.latest('room:state')!.room.players.map((p) => p.name)).toEqual(['Ana', 'Benny']);
+
+    await b.request('room:ready', { ready: true });
+    await a.request('game:start');
+    expect(await a.request('room:rename', { name: 'Anna' })).toMatchObject({ ok: false, error: { code: 'game_in_progress' } });
+  });
+
   it('lets the host take a finished room back to the lobby', async () => {
     const code = await createRoom();
     const a = await connect(code);
@@ -311,7 +327,7 @@ describe('room persistence and timers', () => {
     await a.request('room:join', { name: 'Ana' });
     await b.request('room:join', { name: 'Ben' });
     expect(await b.request('room:settings', { matchMinutes: 10 })).toMatchObject({ ok: false, error: { code: 'not_host' } });
-    expect(await a.request('room:settings', { matchMinutes: 7 })).toMatchObject({ ok: false, error: { code: 'bad_message' } });
+    expect(await a.request('room:settings', { matchMinutes: 6 })).toMatchObject({ ok: false, error: { code: 'bad_message' } });
     expect((await a.request('room:settings', { matchMinutes: 10 })).ok).toBe(true);
     // Changing one setting keeps the other.
     expect(a.latest('room:state')!.room.settings).toEqual({ turnSeconds: 30, matchMinutes: 10 });
