@@ -150,9 +150,9 @@ export const REACTION_COOLDOWN_MS = 600;
 export const THROWABLES = [
   'shoe', 'stone', 'hammer', 'tomato',
   'egg', 'bomb', 'rose', 'poop',
-  'pie', 'angryShoe', 'brick', 'firecracker',
+  'pie', 'brick', 'firecracker',
   'kiss', 'cake', 'sock', 'glove',
-  'pizza', 'chili', 'angryStick', 'balloon',
+  'pizza', 'chili', 'balloon',
 ] as const;
 export type Throwable = (typeof THROWABLES)[number];
 /** Minimum gap between one player's throws. */

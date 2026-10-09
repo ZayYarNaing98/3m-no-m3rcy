@@ -73,11 +73,7 @@ export function ThrowMenu({ target, onCatch, onClose }: { target: ThrowTarget; o
               }}
               aria-label={`Throw ${info.label.toLowerCase()}`}
             >
-              {info.image ? (
-                <img src={info.image} alt="" className="size-7 rounded-lg object-cover ring-1 ring-line" draggable={false} />
-              ) : (
-                <span className="text-2xl leading-none">{info.emoji}</span>
-              )}
+              <span className="text-2xl leading-none">{info.emoji}</span>
               <span className="mt-1 max-w-full truncate text-[0.6rem] text-fg/80">{info.label}</span>
             </button>
           );

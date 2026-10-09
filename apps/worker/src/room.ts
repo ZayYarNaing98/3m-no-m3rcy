@@ -47,7 +47,7 @@ const AFK_TURN_MS = 3_000;
 const RATE_LIMIT_PER_SECOND = 10;
 const BOT_NAMES = ['🤖 John', '🤖 Tom', '🤖 David', '🤖 Jerry', '🤖 Mike', '🤖 Sam', '🤖 Peter', '🤖 Alex'];
 /** What a bot throws back when it's annoyed. */
-const BOT_AMMO: Throwable[] = ['tomato', 'egg', 'shoe', 'pie', 'poop', 'angryShoe', 'angryStick', 'stone', 'sock', 'bomb'];
+const BOT_AMMO: Throwable[] = ['tomato', 'egg', 'shoe', 'pie', 'poop', 'stone', 'sock', 'bomb'];
 /** Minimum gap between one bot's emotes, so it never floods the table. */
 const BOT_EMOTE_GAP_MS = 4_000;
 
