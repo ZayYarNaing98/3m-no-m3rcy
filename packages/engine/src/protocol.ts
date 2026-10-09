@@ -90,7 +90,7 @@ export interface OpenRoom {
 }
 
 /** A Quick play room with one person in it gets a bot after this long. */
-export const AUTO_BOT_MS = 30_000;
+export const AUTO_BOT_MS = 60_000;
 
 /** "finish": score the game now (fewest cards wins). "cancel": no winner, back to the lobby. */
 export type EndOutcome = 'finish' | 'cancel';
