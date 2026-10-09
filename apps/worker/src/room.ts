@@ -44,7 +44,7 @@ const EMPTY_ROOM_TTL_MS = 10 * 60_000;
 /** Turn length for players marked AFK. */
 const AFK_TURN_MS = 3_000;
 const RATE_LIMIT_PER_SECOND = 10;
-const BOT_NAMES = ['🤖 Aye', '🤖 Mya', '🤖 Hla', '🤖 Zaw'];
+const BOT_NAMES = ['🤖 John', '🤖 Tom', '🤖 David', '🤖 Jerry', '🤖 Mike', '🤖 Sam', '🤖 Peter', '🤖 Alex'];
 /** What a bot throws back when it's annoyed. */
 const BOT_AMMO: Throwable[] = ['tomato', 'egg', 'shoe', 'pie', 'poop', 'angryShoe', 'angryStick', 'stone', 'sock', 'bomb'];
 /** Minimum gap between one bot's emotes, so it never floods the table. */
@@ -308,7 +308,8 @@ export class Room extends DurableObject<Env> {
           throw new RoomError('too_many_bots', `A room can have up to ${MAX_BOTS} bots`);
         }
         const taken = new Set(seated.map((s) => s.name.toLowerCase()));
-        const name = BOT_NAMES.find((n) => !taken.has(n.toLowerCase())) ?? `🤖 Bot ${seated.length + 1}`;
+        const free = BOT_NAMES.filter((n) => !taken.has(n.toLowerCase()));
+        const name = free[Math.floor(Math.random() * free.length)] ?? `🤖 Bot ${seated.length + 1}`;
         room.seats.push({
           id: crypto.randomUUID(),
           token: crypto.randomUUID(),
