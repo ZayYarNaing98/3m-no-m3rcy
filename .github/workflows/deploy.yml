@@ -1,0 +1,58 @@
+name: CI / Deploy
+
+on:
+  # Every push to main and every pull request: typecheck and test.
+  push:
+    branches: [main]
+    # A production-* tag also deploys, like the other apps.
+    tags:
+      - 'production-*'
+  pull_request:
+  # Run a deploy by hand from the Actions tab.
+  workflow_dispatch:
+
+# One deploy at a time; a newer one waits instead of racing the older.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Typecheck and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm test
+
+  deploy:
+    name: Deploy to Cloudflare
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/production-') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Builds the web app, then `wrangler deploy` uploads the Worker, its assets and Durable Objects.
+      - name: Deploy
+        run: npm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
