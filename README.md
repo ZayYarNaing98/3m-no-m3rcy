@@ -34,7 +34,7 @@ npx wrangler login   # once
 npm run deploy       # builds the client, then wrangler deploy
 ```
 
-The app is served at `https://em-no-mercy.<your-subdomain>.workers.dev`.
+The app is served at `https://uno.zayarnaing.com` (a Workers custom domain; Cloudflare creates the DNS record and certificate on deploy). The `workers.dev` URL stays on but redirects pages there; its `/api` routes keep working.
 
 ## Rule choices
 

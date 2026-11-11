@@ -4,10 +4,20 @@ export { Matchmaker } from './matchmaker';
 export { Room } from './room';
 
 const CODE_PATTERN = /^[A-HJ-NP-Z2-9]{6}$/;
+const CANONICAL_ORIGIN = 'https://uno.zayarnaing.com';
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    // Pages on workers.dev move to the custom domain. /api stays served there so
+    // games already open on the old URL keep working until players reload.
+    if (!url.pathname.startsWith('/api/')) {
+      if (url.hostname.endsWith('.workers.dev')) {
+        return Response.redirect(CANONICAL_ORIGIN + url.pathname + url.search, 301);
+      }
+      return env.ASSETS.fetch(request);
+    }
 
     if (url.pathname === '/api/rooms' && request.method === 'POST') {
       for (let attempt = 0; attempt < 5; attempt++) {

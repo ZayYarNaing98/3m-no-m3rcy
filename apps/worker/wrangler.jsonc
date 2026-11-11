@@ -7,8 +7,11 @@
     "directory": "../web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    // Run the Worker first so it can redirect workers.dev → uno.zayarnaing.com
+    "run_worker_first": true
   },
+  "workers_dev": true,
+  "routes": [{ "pattern": "uno.zayarnaing.com", "custom_domain": true }],
   "durable_objects": {
     "bindings": [
       { "name": "ROOMS", "class_name": "Room" },
