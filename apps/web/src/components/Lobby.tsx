@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { navigate } from '../App';
 import { useGame } from '../store';
 import { Avatar } from './Avatar';
+import { AvatarPicker } from './AvatarPicker';
 import { ChatButton, ChatPanel } from './Chat';
 import { isLeader } from '../scoreboard';
 import { TableFx } from './TableFx';
@@ -70,7 +71,7 @@ export function Lobby() {
             <li key={p.id} className="flex items-center gap-3 px-4 py-3">
               {p.id === playerId ? (
                 <span data-anchor={`seat:${p.id}`} className="rounded-full">
-                  <Avatar name={p.name} size="sm" online={p.connected} />
+                  <AvatarPicker name={p.name} playerId={p.id} online={p.connected} />
                 </span>
               ) : (
                 <button
@@ -80,7 +81,7 @@ export function Lobby() {
                   aria-label={`Throw something at ${p.name}`}
                   title={`Throw something at ${p.name}`}
                 >
-                  <Avatar name={p.name} size="sm" online={p.connected} />
+                  <Avatar name={p.name} playerId={p.id} size="sm" online={p.connected} />
                 </button>
               )}
               {p.id === playerId && editingName && room.status === 'lobby' ? (

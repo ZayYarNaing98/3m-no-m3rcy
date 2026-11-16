@@ -12,6 +12,7 @@ import {
 import { create } from 'zustand';
 import { describeEvent } from './events';
 import { scheduleEvents } from './fxTiming';
+import { loadAvatar } from './avatar';
 
 type Conn = 'idle' | 'connecting' | 'open' | 'closed';
 type Ack = { ok: true } | { ok: false; error: ErrorInfo };
@@ -252,7 +253,7 @@ export const useGame = create<State>((set, get) => ({
 
   async join(name) {
     pendingName = name;
-    return get().send('room:join', { name });
+    return get().send('room:join', { name, avatar: loadAvatar() });
   },
 
   async rename(name) {

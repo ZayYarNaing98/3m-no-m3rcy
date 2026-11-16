@@ -2,9 +2,17 @@ import type { Color, GameEvent } from './types';
 import type { BotLevel } from './bot';
 import type { PlayerView } from './view';
 
+export const AVATAR_ICONS = ['initials', '🐱', '🐶', '🦊', '🐼', '🐸', '🦁', '🐯', '🐨', '🐰', '🦄', '🐲', '👽', '😎', '🔥', '⭐'] as const;
+export const AVATAR_COLORS = ['red', 'orange', 'green', 'teal', 'blue', 'violet', 'purple', 'pink'] as const;
+export interface PlayerAvatar {
+  icon: (typeof AVATAR_ICONS)[number];
+  color: (typeof AVATAR_COLORS)[number];
+}
+
 /** Wire format: every message is `{ type, requestId?, payload }` as JSON text. */
 export type ClientMessage = { requestId?: string } & (
-  | { type: 'room:join'; payload: { name: string } }
+  | { type: 'room:join'; payload: { name: string; avatar?: PlayerAvatar } }
+  | { type: 'room:avatar'; payload: { avatar: PlayerAvatar } }
   | { type: 'room:rejoin'; payload: { playerToken: string } }
   | { type: 'room:leave'; payload: Record<string, never> }
   | { type: 'room:rename'; payload: { name: string } }
@@ -49,6 +57,7 @@ export interface RoomSettings {
 export interface RoomPlayerView {
   id: string;
   name: string;
+  avatar?: PlayerAvatar;
   connected: boolean;
   afk: boolean;
   /** Ready for the next game. The host starts it, so their own flag is ignored. */

@@ -24,6 +24,7 @@ import {
   CHAT_COOLDOWN_MS,
   CHAT_HISTORY,
   type ChatMessage,
+  type PlayerAvatar,
   playerView,
   type Action,
   type ClientMessage,
@@ -55,6 +56,7 @@ interface Seat {
   id: string;
   token: string;
   name: string;
+  avatar?: PlayerAvatar;
   joinedAt: number;
   afkStrikes: number;
   left: boolean;
@@ -263,6 +265,7 @@ export class Room extends DurableObject<Env> {
           id: crypto.randomUUID(),
           token: crypto.randomUUID(),
           name: msg.payload.name,
+          avatar: msg.payload.avatar,
           joinedAt: Date.now(),
           afkStrikes: 0,
           left: false,
@@ -289,6 +292,12 @@ export class Room extends DurableObject<Env> {
         const seat = this.requireSeat(me);
         this.leaveSeat(seat);
         ws.serializeAttachment({ playerId: null } satisfies SocketAttachment);
+        break;
+      }
+
+      case 'room:avatar': {
+        const seat = this.requireSeat(me);
+        seat.avatar = msg.payload.avatar;
         break;
       }
 
@@ -898,6 +907,7 @@ export class Room extends DurableObject<Env> {
       players: this.seated().map((s) => ({
         id: s.id,
         name: s.name,
+        avatar: s.avatar,
         connected: !!s.bot || connected.has(s.id),
         afk: s.afkStrikes >= AFK_STRIKES,
         ready: !!s.ready,

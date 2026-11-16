@@ -7,9 +7,11 @@ import { useForceDark } from '../theme';
 import { isLeader, winsOf } from '../scoreboard';
 import { useTurnAlerts } from '../turnAlerts';
 import { Avatar } from './Avatar';
+import { AvatarPicker } from './AvatarPicker';
 import { Card, CardBack, COLOR_BG, COLOR_RING } from './Card';
 import { ChatButton, ChatPanel } from './Chat';
 import { TableFx } from './TableFx';
+import { TableStylePicker, useTableStyle } from './TableStylePicker';
 import { seatRectOf, ThrowMenu, type ThrowTarget } from './ThrowMenu';
 
 export function Game() {
@@ -19,6 +21,7 @@ export function Game() {
   useTurnAlerts(game, playerId, room?.status === 'playing' ? deadline : null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [tableStyle, setTableStyle] = useTableStyle();
   // The table version the player already answered a picker for. Pickers hide as soon as a choice
   // is tapped, instead of waiting for the next table state (which may be held while an
   // elimination plays out).
@@ -62,10 +65,11 @@ export function Game() {
 
   return (
     // Exactly one screen tall: the table flexes to fill what the header, status and hand leave.
-    <div className="mx-auto flex h-dvh max-w-5xl flex-col gap-2 overflow-hidden p-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:gap-3 sm:p-3">
+    <div data-table-style={tableStyle} className="table-appearance mx-auto flex h-dvh max-w-5xl flex-col gap-2 overflow-hidden p-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:gap-3 sm:p-3">
       <div className="flex flex-none items-center justify-between gap-2 text-sm">
         <RoomCodeChip code={room.code} />
         <span className="flex items-center gap-2">
+          <TableStylePicker style={tableStyle} onChange={setTableStyle} />
           <SoundToggle />
           {room.spectators > 0 && (
             <span
@@ -563,9 +567,9 @@ function PokerTable({
             style={{ width: ovalW, height: ovalH }}
           >
             {/* Rail */}
-            <div className="absolute inset-0 rounded-[50%] bg-gradient-to-b from-zinc-600 via-zinc-800 to-zinc-950 shadow-[0_24px_60px_rgba(0,0,0,0.65)] ring-1 ring-white/10" />
+            <div className="table-rail absolute inset-0 rounded-[50%] shadow-[0_24px_60px_rgba(0,0,0,0.65)] ring-1 ring-white/10" />
             {/* Felt */}
-            <div className="absolute inset-[12px] rounded-[50%] bg-[radial-gradient(ellipse_at_center,#24a055_0%,#177a40_55%,#0d4f29_100%)] shadow-[inset_0_0_60px_rgba(0,0,0,0.55)] sm:inset-[18px]" />
+            <div className="table-felt absolute inset-[12px] rounded-[50%] shadow-[inset_0_0_60px_rgba(0,0,0,0.55)] sm:inset-[18px]" />
             {/* Inner line */}
             <div className="absolute inset-[11%] rounded-[50%] border-2 border-white/10" />
 
@@ -620,6 +624,7 @@ function PokerTable({
                   className="flex items-center gap-2 rounded-full bg-zinc-900/95 py-1 pr-3 pl-1 whitespace-nowrap shadow-lg ring-1 ring-white/15">
                   <Avatar
                     name={me.name}
+                    playerId={me.id}
                     size="sm"
                     active={me.id === game.currentPlayerId && me.status === 'active'}
                     dimmed={me.status === 'eliminated'}
@@ -705,7 +710,7 @@ function Seat({
         className={`flex w-14 flex-col items-center ${p.status !== 'active' ? 'opacity-60' : ''}`}
       >
         <SeatTap name={p.name} onTap={onTap}>
-          <Avatar name={p.name} size="sm" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
+          <Avatar name={p.name} playerId={p.id} size="sm" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
           {leader && <Crown />}
           <span
             className={`absolute -right-2 -bottom-1 rounded-full px-1 text-[0.6rem] font-black ring-2 ring-slate-900 ${
@@ -744,7 +749,7 @@ function Seat({
       className={`flex w-20 flex-col items-center sm:w-24 ${p.status !== 'active' ? 'opacity-60' : ''}`}
     >
       <SeatTap name={p.name} onTap={onTap}>
-        <Avatar name={p.name} size="md" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
+        <Avatar name={p.name} playerId={p.id} size="md" online={online} active={isTurn} dimmed={p.status === 'eliminated'} />
         {leader && <Crown />}
       </SeatTap>
       <div
@@ -984,7 +989,7 @@ function MyHand({
   return (
     <div className="rounded-3xl bg-white/5 p-2 sm:p-3">
       <div className="mb-1 flex items-center gap-2 text-sm sm:mb-2">
-        <Avatar name={me.name} size="sm" active={myTurn} />
+        <AvatarPicker name={me.name} playerId={me.id} active={myTurn} />
         <span className="font-semibold">You · {game.hand.length} cards</span>
         <div className="flex-1">
           <MercyBar count={game.hand.length} />
@@ -1061,7 +1066,7 @@ function SwapSheet({ players, onPick }: { players: PublicPlayer[]; onPick: (id: 
       <div className="flex flex-col gap-2">
         {players.map((p) => (
           <button key={p.id} className="btn-secondary flex items-center gap-3" onClick={() => onPick(p.id)}>
-            <Avatar name={p.name} size="sm" />
+            <Avatar name={p.name} playerId={p.id} size="sm" />
             <span className="flex-1 text-left">{p.name}</span>
             <span className="text-slate-400">{p.cardCount} cards</span>
           </button>
@@ -1134,7 +1139,7 @@ function Results({ game, isHost }: { game: PlayerView; isHost: boolean }) {
         {ranking.map((id, i) => (
           <li key={id} className="flex items-center gap-2 rounded-lg bg-white/5 px-3 py-1.5">
             <span className="w-4 text-slate-400">{i + 1}</span>
-            <Avatar name={game.players.find((p) => p.id === id)?.name ?? '?'} size="xs" />
+            <Avatar name={game.players.find((p) => p.id === id)?.name ?? '?'} playerId={id} size="xs" />
             <span className="flex-1">{name(id)}</span>
             {id === winnerId && <span className="animate-pop text-xs font-bold text-amber-300">+1 🏆</span>}
             <span className="w-8 text-right text-xs text-slate-400 tabular-nums">🏆{winsOf(room, id)}</span>

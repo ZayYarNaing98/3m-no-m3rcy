@@ -1,10 +1,11 @@
-import { BOT_LEVELS, CHAT_MAX_LENGTH, COLORS, MATCH_MINUTES_OPTIONS, REACTIONS, THROWABLES, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
+import { AVATAR_COLORS, AVATAR_ICONS, BOT_LEVELS, CHAT_MAX_LENGTH, COLORS, MATCH_MINUTES_OPTIONS, REACTIONS, THROWABLES, TURN_SECONDS_OPTIONS, type ClientMessage } from '@nomercy/engine';
 import { z } from 'zod';
 
 const id = z.string().min(1).max(64);
 const color = z.enum(COLORS);
 const empty = z.object({}).strict().default({});
 const version = z.number().int().nonnegative();
+const avatar = z.object({ icon: z.enum(AVATAR_ICONS), color: z.enum(AVATAR_COLORS) }).strict();
 
 export const NAME_MAX = 20;
 const name = z.string().trim().min(1, 'Enter a name').max(NAME_MAX, `Keep it under ${NAME_MAX} characters`);
@@ -13,7 +14,8 @@ const msg = <T extends string, P extends z.ZodType>(type: T, payload: P) =>
   z.object({ type: z.literal(type), requestId: z.string().max(64).optional(), payload });
 
 export const clientMessageSchema = z.discriminatedUnion('type', [
-  msg('room:join', z.object({ name })),
+  msg('room:join', z.object({ name, avatar: avatar.optional() })),
+  msg('room:avatar', z.object({ avatar })),
   msg('room:rename', z.object({ name })),
   msg('room:rejoin', z.object({ playerToken: id })),
   msg('room:leave', empty),

@@ -153,7 +153,7 @@ export function ChatPanel() {
           const mine = m.playerId === playerId;
           return (
             <div key={m.id} className={`flex gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
-              <Avatar name={m.name} size="xs" />
+              <Avatar name={m.name} playerId={m.playerId} size="xs" />
               <div className={`max-w-[80%] ${mine ? 'text-right' : ''}`}>
                 <div className="text-xs text-muted">
                   {mine ? 'You' : m.name} · {time(m.at)}

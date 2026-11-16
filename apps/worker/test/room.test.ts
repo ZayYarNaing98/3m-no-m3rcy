@@ -174,6 +174,28 @@ describe('room over WebSocket', () => {
     expect(await a.request('room:rename', { name: 'Anna' })).toMatchObject({ ok: false, error: { code: 'game_in_progress' } });
   });
 
+  it('shares avatar changes with the room and restores them on rejoin', async () => {
+    const code = await createRoom();
+    const a = await connect(code);
+    const b = await connect(code);
+    const avatar = { icon: '🦊', color: 'blue' };
+    expect((await a.request('room:join', { name: 'Ana', avatar })).ok).toBe(true);
+    const welcome = a.latest('welcome')!;
+    await b.request('room:join', { name: 'Ben' });
+    expect(b.latest('room:state')!.room.players[0]!.avatar).toEqual(avatar);
+    expect(await b.request('room:avatar', { avatar: { icon: 'invalid', color: 'red' } })).toMatchObject({ ok: false });
+    await b.request('room:ready', { ready: true });
+    await a.request('game:start');
+    const changed = { icon: '🐼', color: 'purple' };
+    expect((await a.request('room:avatar', { avatar: changed })).ok).toBe(true);
+    await b.waitFor((m): m is Extract<ServerMessage, { type: 'room:state' }> =>
+      m.type === 'room:state' && m.room.players[0]?.avatar?.icon === '🐼');
+    const spectator = await connect(code);
+    expect(await spectator.request('room:avatar', { avatar })).toMatchObject({ ok: false });
+    expect((await spectator.request('room:rejoin', { playerToken: welcome.playerToken })).ok).toBe(true);
+    expect(spectator.latest('room:state')!.room.players[0]!.avatar).toEqual(changed);
+  });
+
   it('lets the host take a finished room back to the lobby', async () => {
     const code = await createRoom();
     const a = await connect(code);

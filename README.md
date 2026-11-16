@@ -29,6 +29,10 @@ npm run typecheck
 
 The client reconnects automatically after a connection drop and offers **Reconnect now** to retry immediately. Your saved seat is restored when you reconnect. Requests stop waiting after 10 seconds; check the table before retrying, since the original move may already have reached the server.
 
+Use **Table** in the game header to choose Classic, Midnight, Royal, or Ruby. The previews apply immediately, affect only your view, and your choice is saved on this device.
+
+Click your avatar in the lobby or beside your hand to pick an icon and background color. Save to share it with the room; the choice is remembered on this device for future rooms. Initials remain available.
+
 ## Deploy
 
 ```sh

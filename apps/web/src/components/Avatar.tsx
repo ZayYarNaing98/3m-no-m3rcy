@@ -1,14 +1,16 @@
-/** Background gradients for avatars; picked from a hash of the player's name. */
-const GRADIENTS = [
-  'from-rose-500 to-red-700',
-  'from-amber-400 to-orange-600',
-  'from-lime-400 to-emerald-600',
-  'from-teal-400 to-cyan-700',
-  'from-sky-400 to-blue-700',
-  'from-indigo-400 to-violet-700',
-  'from-fuchsia-400 to-purple-700',
-  'from-pink-400 to-rose-600',
-];
+import { AVATAR_COLORS, type PlayerAvatar } from '@nomercy/engine';
+import { useGame } from '../store';
+
+export const AVATAR_GRADIENTS: Record<PlayerAvatar['color'], string> = {
+  red: 'from-rose-500 to-red-700',
+  orange: 'from-amber-400 to-orange-600',
+  green: 'from-lime-400 to-emerald-600',
+  teal: 'from-teal-400 to-cyan-700',
+  blue: 'from-sky-400 to-blue-700',
+  violet: 'from-indigo-400 to-violet-700',
+  purple: 'from-fuchsia-400 to-purple-700',
+  pink: 'from-pink-400 to-rose-600',
+};
 
 const SIZES = {
   xs: 'h-6 w-6 text-[0.65rem]',
@@ -20,6 +22,10 @@ function hash(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) | 0;
   return Math.abs(h);
+}
+
+export function defaultAvatar(name: string): PlayerAvatar {
+  return { icon: 'initials', color: AVATAR_COLORS[hash(name.toLowerCase()) % AVATAR_COLORS.length]! };
 }
 
 function initials(name: string): string {
@@ -34,12 +40,17 @@ function initials(name: string): string {
 
 export function Avatar({
   name,
+  playerId,
+  avatar,
   size = 'sm',
   online,
   active,
   dimmed,
 }: {
   name: string;
+  playerId?: string;
+  /** Explicit appearance for previews; otherwise look up the player's room choice. */
+  avatar?: PlayerAvatar;
   size?: keyof typeof SIZES;
   /** Shows a green/grey presence dot when defined. */
   online?: boolean;
@@ -47,7 +58,9 @@ export function Avatar({
   active?: boolean;
   dimmed?: boolean;
 }) {
-  const gradient = GRADIENTS[hash(name.toLowerCase()) % GRADIENTS.length];
+  const roomAvatar = useGame((s) => playerId ? s.room?.players.find((p) => p.id === playerId)?.avatar : undefined);
+  const appearance = avatar ?? roomAvatar ?? defaultAvatar(name);
+  const gradient = AVATAR_GRADIENTS[appearance.color];
   return (
     <span className={`relative inline-flex shrink-0 ${dimmed ? 'opacity-50 grayscale' : ''}`} aria-hidden="true">
       <span
@@ -55,7 +68,7 @@ export function Avatar({
           active ? 'animate-turn ring-amber-300' : 'ring-white/20'
         }`}
       >
-        {initials(name) || '?'}
+        {appearance.icon === 'initials' ? initials(name) || '?' : appearance.icon}
       </span>
       {online !== undefined && (
         <span

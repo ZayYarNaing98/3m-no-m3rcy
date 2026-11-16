@@ -1,5 +1,50 @@
 @import 'tailwindcss';
 
+/* Shared by the live table and the miniature style previews. */
+.table-appearance {
+  --felt-center: #24a055;
+  --felt-mid: #177a40;
+  --felt-edge: #0d4f29;
+  --rail-top: #52525b;
+  --rail-mid: #27272a;
+  --rail-bottom: #09090b;
+}
+
+.table-appearance[data-table-style='midnight'] {
+  --felt-center: #247da5;
+  --felt-mid: #155474;
+  --felt-edge: #082f49;
+  --rail-top: #94a3b8;
+  --rail-mid: #475569;
+  --rail-bottom: #0f172a;
+}
+
+.table-appearance[data-table-style='royal'] {
+  --felt-center: #8554b8;
+  --felt-mid: #593080;
+  --felt-edge: #2e1747;
+  --rail-top: #d4b16a;
+  --rail-mid: #80602c;
+  --rail-bottom: #30230e;
+}
+
+.table-appearance[data-table-style='ruby'] {
+  --felt-center: #b13f5d;
+  --felt-mid: #7b243c;
+  --felt-edge: #450f25;
+  --rail-top: #98704f;
+  --rail-mid: #553726;
+  --rail-bottom: #24150e;
+}
+
+.table-rail {
+  background: linear-gradient(to bottom, var(--rail-top), var(--rail-mid), var(--rail-bottom));
+}
+
+.table-felt {
+  background: radial-gradient(ellipse at center, var(--felt-center) 0%, var(--felt-mid) 55%, var(--felt-edge) 100%);
+}
+
 /*
  * Colour tokens. Dark is the default and what the game table always uses; the screens around a
  * game (home, join, lobby) switch to light with data-theme="light" on <html> (see theme.ts).
