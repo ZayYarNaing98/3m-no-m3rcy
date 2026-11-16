@@ -275,7 +275,8 @@ function resolveEffect(ctx: Ctx, card: Card, carried: number): void {
     case 'wildReverseDraw4':
       s.direction = s.direction === 1 ? -1 : 1;
       events.push({ type: 'reversed', direction: s.direction });
-      return startStack(ctx, carried + 4, 4);
+      // With two active players, Reverse skips the opponent: the penalty returns to the player who played it.
+      return startStack(ctx, carried + 4, 4, activePlayers(s).length === 2 ? 2 : 1);
     case 'draw2':
       return startStack(ctx, carried + 2, 2);
     case 'draw4':
@@ -311,10 +312,10 @@ function resolveEffect(ctx: Ctx, card: Card, carried: number): void {
   }
 }
 
-function startStack(ctx: Ctx, total: number, minValue: StackValue): void {
+function startStack(ctx: Ctx, total: number, minValue: StackValue, steps = 1): void {
   const { s, events } = ctx;
   events.push({ type: 'stackGrew', total });
-  s.currentIndex = nextActiveIndex(s, s.currentIndex, 1);
+  s.currentIndex = nextActiveIndex(s, s.currentIndex, steps);
   s.phase = { kind: 'respondToStack', pending: total, minValue };
   s.turn++;
 }

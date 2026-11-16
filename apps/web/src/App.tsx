@@ -34,6 +34,7 @@ export function App() {
   return (
     <>
       {code ? <RoomScreen key={code} code={code} /> : <Home />}
+      {code && <ConnectionStatus />}
       <Toast />
     </>
   );
@@ -45,6 +46,7 @@ function RoomScreen({ code }: { code: string }) {
 
   useEffect(() => {
     connect(code);
+    return () => useGame.getState().disconnect();
   }, [code, connect]);
 
   if (closedReason) {
@@ -96,13 +98,23 @@ export function Centered({ children }: { children: React.ReactNode }) {
 
 function Toast() {
   const toast = useGame((s) => s.toast);
-  const conn = useGame((s) => s.conn);
-  const code = useGame((s) => s.code);
-  const message = toast ?? (code && conn === 'connecting' ? 'Reconnecting…' : null);
-  if (!message) return null;
+  if (!toast) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
-      <div className="rounded-full bg-raised-2/95 px-4 py-2 text-sm shadow-lg ring-1 ring-line">{message}</div>
+      <div role="status" className="rounded-full bg-raised-2/95 px-4 py-2 text-sm shadow-lg ring-1 ring-line">{toast}</div>
+    </div>
+  );
+}
+
+function ConnectionStatus() {
+  const { conn, ready, closedReason, reconnect } = useGame();
+  if (closedReason || (conn === 'open' && ready) || conn === 'idle') return null;
+  return (
+    <div className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
+      <div className="flex items-center gap-3 rounded-2xl bg-raised px-4 py-3 text-sm shadow-lg ring-1 ring-line">
+        <p role="status">{conn === 'open' ? 'Restoring your seat…' : 'Connecting to the room…'}</p>
+        <button className="btn-secondary px-3 py-1.5" onClick={reconnect}>Reconnect now</button>
+      </div>
     </div>
   );
 }

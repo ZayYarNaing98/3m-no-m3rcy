@@ -23,9 +23,11 @@ npm run dev:web
 ## Test
 
 ```sh
-npm test          # engine unit tests + 1,000-game simulation, Durable Object tests
+npm test          # engine + 1,000-game simulation, client connection tests, Durable Object tests
 npm run typecheck
 ```
+
+The client reconnects automatically after a connection drop and offers **Reconnect now** to retry immediately. Your saved seat is restored when you reconnect. Requests stop waiting after 10 seconds; check the table before retrying, since the original move may already have reached the server.
 
 ## Deploy
 
@@ -38,6 +40,7 @@ The app is served at `https://uno.zayarnaing.com` (a Workers custom domain; Clou
 
 ## Rule choices
 
+- With two active players, Wild Reverse +4 skips the opponent and returns the draw penalty (including any existing stack) to the player who played it. They may stack again or take the penalty.
 - Stacking accepts a draw card of equal or higher value (+2 ≤ +4 ≤ +6 ≤ +10) that could also be played normally: a wild draw card, a coloured one in the colour in play, or the same card as the top one (blue +4 on red +4). A coloured +4 can also go on a +2 in any colour (blue +4 on red +2).
 - The first discard is always a number card.
 - Colour Roulette: the player who plays it doesn't pick a colour. The next player names one, flips until it appears, keeps every flipped card, and loses their turn; the named colour becomes the colour in play.

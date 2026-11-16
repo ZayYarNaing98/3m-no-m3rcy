@@ -48,6 +48,7 @@ interface State {
   closedReason: string | null;
 
   connect(code: string): void;
+  reconnect(): void;
   disconnect(): void;
   send(type: string, payload?: object): Promise<Ack>;
   join(name: string): Promise<Ack>;
@@ -112,6 +113,18 @@ let requestSeq = 0;
 const pending = new Map<string, (ack: Ack) => void>();
 let pendingName = '';
 
+function settlePending() {
+  for (const resolve of pending.values()) resolve({ ok: false, error: { code: 'closed', message: 'Disconnected' } });
+  pending.clear();
+}
+
+function closeSocket() {
+  const previous = socket;
+  socket = null;
+  previous?.close();
+  settlePending();
+}
+
 export const useGame = create<State>((set, get) => ({
   code: null,
   conn: 'idle',
@@ -135,15 +148,16 @@ export const useGame = create<State>((set, get) => ({
   connect(code) {
     clearTimeout(retryTimer);
     if (socket && get().code === code && get().conn !== 'closed') return;
-    socket?.close();
+    closeSocket();
     intentionalClose = false;
-    set({ code, conn: 'connecting', closedReason: null, ...(get().code !== code ? freshRoom() : {}) });
+    set({ code, conn: 'connecting', ready: false, closedReason: null, ...(get().code !== code ? freshRoom() : {}) });
 
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}/api/rooms/${code}/ws`);
     socket = ws;
 
     ws.onopen = async () => {
+      if (socket !== ws) return;
       retry = 0;
       set({ conn: 'open' });
       const seat = loadSeat(code);
@@ -152,6 +166,11 @@ export const useGame = create<State>((set, get) => ({
         return;
       }
       const ack = await get().send('room:rejoin', { playerToken: seat.token });
+      if (socket !== ws) return;
+      if (!ack.ok && (ack.error.code === 'timeout' || ack.error.code === 'closed')) {
+        ws.close();
+        return;
+      }
       if (!ack.ok) {
         saveSeat(code, null);
         set({ playerId: null });
@@ -159,13 +178,14 @@ export const useGame = create<State>((set, get) => ({
       set({ ready: true });
     };
 
-    ws.onmessage = (e) => handleMessage(JSON.parse(e.data as string) as ServerMessage);
+    ws.onmessage = (e) => {
+      if (socket === ws) handleMessage(JSON.parse(e.data as string) as ServerMessage);
+    };
 
     ws.onclose = (e) => {
       if (socket !== ws) return;
       socket = null;
-      for (const resolve of pending.values()) resolve({ ok: false, error: { code: 'closed', message: 'Disconnected' } });
-      pending.clear();
+      settlePending();
       if (e.code === 4001) {
         saveSeat(code, null);
         set({ conn: 'closed', playerId: null, closedReason: 'The host removed you from the room.' });
@@ -185,11 +205,19 @@ export const useGame = create<State>((set, get) => ({
     };
   },
 
+  reconnect() {
+    const { code, closedReason } = get();
+    if (!code || closedReason) return;
+    clearTimeout(retryTimer);
+    closeSocket();
+    retry = 0;
+    get().connect(code);
+  },
+
   disconnect() {
     intentionalClose = true;
     clearTimeout(retryTimer);
-    socket?.close();
-    socket = null;
+    closeSocket();
     set({ code: null, conn: 'idle', ...freshRoom() });
   },
 
@@ -200,8 +228,22 @@ export const useGame = create<State>((set, get) => ({
         return;
       }
       const requestId = `q${++requestSeq}`;
-      pending.set(requestId, resolve);
-      socket.send(JSON.stringify({ type, requestId, payload }));
+      const timer = setTimeout(() => {
+        pending.get(requestId)?.({ ok: false, error: {
+          code: 'timeout', message: 'No response yet. Check the table before trying again.',
+        } });
+      }, 10_000);
+      const finish = (ack: Ack) => {
+        clearTimeout(timer);
+        pending.delete(requestId);
+        resolve(ack);
+      };
+      pending.set(requestId, finish);
+      try {
+        socket.send(JSON.stringify({ type, requestId, payload }));
+      } catch {
+        finish({ ok: false, error: { code: 'closed', message: 'Disconnected' } });
+      }
     }).then((ack) => {
       if (!ack.ok && ack.error.code !== 'closed') get().showToast(ack.error.message);
       return ack;

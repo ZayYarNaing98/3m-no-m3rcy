@@ -264,10 +264,11 @@ describe('stacking', () => {
   });
 
   it('only stacks coloured draw cards in the colour in play or on the same card', () => {
-    // Two players: the Wild Reverse +4 still passes the stack to p1.
+    // Three players: reversing passes the stack to the previous seat, p2.
     let s: GameState = makeState({
       hands: [
         [[null, 'wildReverseDraw4'], [R, 'number', 1]],
+        [[G, 'number', 2]],
         [[R, 'draw4'], [Y, 'draw4'], [null, 'wildDraw6'], [B, 'draw2'], [G, 'number', 1]],
       ],
       top: [Y, 'number', 5],
@@ -275,14 +276,14 @@ describe('stacking', () => {
     s = applyAction(s, 'p0', { type: 'play', cardId: cardId(s, 0, 'wildReverseDraw4') }).state;
     s = applyAction(s, 'p0', { type: 'chooseColor', color: Y }).state;
     expect(s.phase).toMatchObject({ kind: 'respondToStack', minValue: 4 });
-    expect(s.players[s.currentIndex]?.id).toBe('p1');
+    expect(s.players[s.currentIndex]?.id).toBe('p2');
 
     // Yellow is in play: the yellow +4 and the wild +6 can stack, the red +4 and the +2 can't.
-    const hand = s.players[1]!.hand;
-    const legal = legalCardIds(s, 'p1').map((id) => hand.find((c) => c.id === id)!);
+    const hand = s.players[2]!.hand;
+    const legal = legalCardIds(s, 'p2').map((id) => hand.find((c) => c.id === id)!);
     expect(legal.map((c) => `${c.color ?? 'wild'} ${c.kind.type}`).sort()).toEqual(['wild wildDraw6', 'yellow draw4']);
     const redDraw4 = hand.find((c) => c.color === R && c.kind.type === 'draw4')!;
-    expectCode(() => applyAction(s, 'p1', { type: 'play', cardId: redDraw4.id }), 'illegal_card');
+    expectCode(() => applyAction(s, 'p2', { type: 'play', cardId: redDraw4.id }), 'illegal_card');
 
     // Same card, different colour: blue +4 stacks on red +4.
     let t: GameState = makeState({
@@ -318,6 +319,45 @@ describe('stacking', () => {
     expect(s.currentIndex).toBe(2);
     expect(s.phase).toEqual({ kind: 'respondToStack', pending: 4, minValue: 4 });
     expect(s.activeColor).toBe(B);
+  });
+
+  it.each([1, -1] as const)('returns Reverse +4 to its player with two players in direction %s', (direction) => {
+    let s = makeState({
+      hands: [[[null, 'wildReverseDraw4'], [R, 'number', 1]], [[B, 'number', 1]]],
+      top: [R, 'number', 5],
+      direction,
+    });
+    s = applyAction(s, 'p0', { type: 'play', cardId: cardId(s, 0, 'wildReverseDraw4') }).state;
+    s = applyAction(s, 'p0', { type: 'chooseColor', color: B }).state;
+    expect(s.direction).toBe(-direction);
+    expect(s.currentIndex).toBe(0);
+    expect(s.phase).toEqual({ kind: 'respondToStack', pending: 4, minValue: 4 });
+    s = applyAction(s, 'p0', { type: 'draw' }).state;
+    expect(s.players[0]!.hand).toHaveLength(5);
+    expect(s.players[1]!.hand).toHaveLength(1);
+    expect(s.currentIndex).toBe(1);
+  });
+
+  it('returns the full stack to the Reverse +4 player when only two players remain', () => {
+    let s = makeState({
+      hands: [
+        [[R, 'draw2'], [R, 'number', 1]],
+        [],
+        [[null, 'wildReverseDraw4'], [B, 'number', 1]],
+      ],
+      top: [R, 'number', 5],
+    });
+    s.players[1]!.status = 'eliminated';
+    s.eliminationOrder = ['p1'];
+    s = applyAction(s, 'p0', { type: 'play', cardId: cardId(s, 0, 'draw2') }).state;
+    s = applyAction(s, 'p2', { type: 'play', cardId: cardId(s, 2, 'wildReverseDraw4') }).state;
+    s = applyAction(s, 'p2', { type: 'chooseColor', color: B }).state;
+    expect(s.currentIndex).toBe(2);
+    expect(s.phase).toEqual({ kind: 'respondToStack', pending: 6, minValue: 4 });
+    s = applyAction(s, 'p2', { type: 'draw' }).state;
+    expect(s.players[2]!.hand).toHaveLength(7);
+    expect(s.players[0]!.hand).toHaveLength(1);
+    expect(s.currentIndex).toBe(0);
   });
 });
 
